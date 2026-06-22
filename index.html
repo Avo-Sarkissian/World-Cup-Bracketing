@@ -416,6 +416,20 @@ class Component extends DCLogic {
     });
     this.NEXT = {};
     this.KO_DEF.forEach(rd => rd.matches.forEach(md => { this.NEXT[md.a] = md.id; this.NEXT[md.b] = md.id; }));
+    // Bracket display order: an in-order walk of the knockout tree so every match is drawn between the two
+    // it feeds into. (FIFA fixture order keeps R32->QF adjacent but breaks QF->SF.) This reorders rows only —
+    // matchups and seeding are unchanged.
+    this.ROUND_ORDER = {};
+    const koKids = {}; this.KO_DEF.forEach(rd => rd.matches.forEach(m => { koKids[m.id] = [m.a, m.b]; }));
+    const roundKeyOf = {}; this.R32_DEF.forEach(d => { roundKeyOf[d.id] = 'r32'; }); this.KO_DEF.forEach(rd => rd.matches.forEach(m => { roundKeyOf[m.id] = rd.key; }));
+    const rootMatch = this.KO_DEF[this.KO_DEF.length - 1].matches[0].id;
+    const walkTree = (id) => {
+      const c = koKids[id];
+      if (c) walkTree(c[0]);
+      (this.ROUND_ORDER[roundKeyOf[id]] = this.ROUND_ORDER[roundKeyOf[id]] || []).push(id);
+      if (c) walkTree(c[1]);
+    };
+    walkTree(rootMatch);
     this.PLAYERS = [
       { id:'mbappe', name:'Kylian Mbappé', team:'France', code:'fr' },
       { id:'haaland', name:'Erling Haaland', team:'Norway', code:'no' },
@@ -696,6 +710,7 @@ class Component extends DCLogic {
       matches.forEach(m => { resultById[m.id] = winner(m); });
       raw.push({ key:rd.key, name:rd.name, matches });
     });
+    raw.forEach(r => { const ord = this.ROUND_ORDER[r.key]; if (ord) r.matches.sort((a,b) => ord.indexOf(a.id) - ord.indexOf(b.id)); });
     const fm = raw[raw.length - 1].matches[0];
     const champion = resultById[fm.id] || { tbd:true, label:'TBD' };
     let runnerUp = { tbd:true, label:'TBD' };
