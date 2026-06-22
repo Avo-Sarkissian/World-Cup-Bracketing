@@ -465,7 +465,7 @@ class Component extends DCLogic {
     const def = { view:'groups', mode:'predict', orders:this.defaultOrders(), picks:{}, golden:null, toast:'', updatedAt:Date.now(), feed:'idle', thirdsOrder:null };
     try {
       const raw = localStorage.getItem(this.KEY);
-      if (raw) { const p = JSON.parse(raw); return { ...def, mode:p.mode||'predict', orders:{ ...def.orders, ...(p.orders||{}) }, picks:p.picks||{}, golden:p.golden ?? null, thirdsOrder: Array.isArray(p.thirdsOrder) ? p.thirdsOrder : null }; }
+      if (raw) { const p = JSON.parse(raw); return { ...def, orders:{ ...def.orders, ...(p.orders||{}) }, picks:p.picks||{}, golden:p.golden ?? null, thirdsOrder: Array.isArray(p.thirdsOrder) ? p.thirdsOrder : null }; }
     } catch (e) {}
     return def;
   }
