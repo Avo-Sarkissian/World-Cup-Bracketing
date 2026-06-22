@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#0a0a0a}
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:#353535;border-radius:99px}
+  ::-webkit-scrollbar-track{background:transparent}
+  .num{font-variant-numeric:tabular-nums lining-nums}
+  @keyframes viewIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(14px) translateX(-50%)}to{opacity:1;transform:translateY(0) translateX(-50%)}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0a0a0a;color:#f3f3f3;font-family:'Archivo',sans-serif;position:relative;">
+
+  <!-- TOP BAR -->
+  <div style="position:sticky;top:0;z-index:30;background:rgba(10,10,10,.85);backdrop-filter:blur(12px);border-bottom:1px solid #272727;display:flex;align-items:center;gap:22px;padding:13px 30px;">
+    <div style="display:flex;align-items:baseline;gap:10px;">
+      <span style="font-family:'Anton',sans-serif;font-size:24px;letter-spacing:.02em;">WC26</span>
+      <span style="font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#767676;">Predictor</span>
+    </div>
+
+    <div style="display:flex;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:9px;padding:3px;gap:3px;">
+      <button data-mode="live" onClick="{{ onMode }}" style="display:flex;align-items:center;gap:6px;background:{{ liveBg }};border:none;color:{{ liveColor }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .2s;"><span style="width:6px;height:6px;border-radius:50%;background:{{ liveDot }};"></span>Live</button>
+      <button data-mode="predict" onClick="{{ onMode }}" style="background:{{ predBg }};border:none;color:{{ predColor }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .2s;">Predict</button>
+    </div>
+
+    <nav style="display:flex;gap:2px;">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="4">
+        <button data-key="{{ tab.key }}" onClick="{{ onNav }}" style="background:transparent;border:none;border-bottom:2px solid {{ tab.under }};color:{{ tab.color }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:8px 13px;cursor:pointer;transition:color .2s;">{{ tab.label }}</button>
+      </sc-for>
+    </nav>
+    <div style="flex:1;"></div>
+    <button onClick="{{ onSave }}" style="background:transparent;border:1px solid #3b3b3b;color:#d2d2d2;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:6px;cursor:pointer;letter-spacing:.04em;">Save</button>
+    <button onClick="{{ onShare }}" style="background:{{ accent }};border:none;color:#1a1505;font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;padding:8px 16px;border-radius:6px;cursor:pointer;letter-spacing:.04em;">Share</button>
+  </div>
+
+  <!-- LIVE TICKER -->
+  <div style="border-bottom:1px solid #1c1c1c;background:#0c0c0c;overflow-x:auto;">
+    <div style="display:flex;gap:0;min-width:max-content;align-items:stretch;">
+      <div style="flex:none;display:flex;align-items:center;gap:9px;padding:0 16px;border-right:1px solid #1c1c1c;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#ff5a4d;"></span>
+        <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#767676;font-weight:700;">{{ feedLabel }}</span>
+        <span style="font-size:10px;color:#5c5c5c;white-space:nowrap;">· {{ updatedLabel }}</span>
+        <button onClick="{{ onRefresh }}" title="Refresh feed" style="background:transparent;border:none;color:#767676;cursor:pointer;font-size:13px;line-height:1;padding:2px 3px;">⟳</button>
+      </div>
+      <sc-for list="{{ fixtures }}" as="f" hint-placeholder-count="8">
+        <div class="num" style="flex:none;display:flex;align-items:center;gap:10px;padding:9px 18px;border-right:1px solid #1c1c1c;">
+          <span style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5c5c5c;width:46px;">{{ f.group }}</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.08em;color:{{ f.statusColor }};width:30px;">{{ f.statusText }}</span>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:600;color:#d2d2d2;">{{ f.aAbbr }}</span><img loading="lazy" decoding="async" src="{{ f.aFlag }}" alt="" style="width:18px;height:12px;object-fit:cover;border-radius:1px;box-shadow:0 0 0 1px rgba(255,255,255,.12);"></div>
+          <span style="font-size:13px;font-weight:700;color:#f3f3f3;min-width:34px;text-align:center;">{{ f.score }}</span>
+          <div style="display:flex;align-items:center;gap:6px;"><img loading="lazy" decoding="async" src="{{ f.bFlag }}" alt="" style="width:18px;height:12px;object-fit:cover;border-radius:1px;box-shadow:0 0 0 1px rgba(255,255,255,.12);"><span style="font-size:12px;font-weight:600;color:#d2d2d2;">{{ f.bAbbr }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ============ GROUPS ============ -->
+  <sc-if value="{{ isGroups }}" hint-placeholder-val="{{ true }}">
+    <div style="animation:viewIn .35s ease both;max-width:1320px;margin:0 auto;padding:30px 30px 70px;">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:14px;">
+        <div>
+          <h2 style="font-family:'Anton',sans-serif;font-size:38px;line-height:.95;margin:0;letter-spacing:.01em;">GROUP STAGE</h2>
+          <p style="margin:8px 0 0;color:#9a9a9a;font-size:14px;max-width:660px;text-wrap:pretty;">{{ groupSub }}</p>
+        </div>
+        <div style="display:flex;gap:18px;font-size:12px;color:#838383;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="width:12px;height:3px;background:#57c98a;"></span>Through</span>
+          <span style="display:flex;align-items:center;gap:7px;"><span style="width:12px;height:3px;background:#f5b13d;"></span>Best-3rd</span>
+          <span style="display:flex;align-items:center;gap:7px;"><span style="width:12px;height:3px;background:rgba(255,255,255,.3);"></span>Out / TBD</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;margin-top:24px;">
+        <sc-for list="{{ groupViews }}" as="group" hint-placeholder-count="12">
+          <div style="background:#151515;border:1px solid #272727;border-radius:9px;padding:16px 16px 14px;">
+            <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px;">
+              <span style="font-family:'Anton',sans-serif;font-size:30px;color:#3b3b3b;line-height:.8;">{{ group.letter }}</span>
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:700;letter-spacing:.01em;">Group {{ group.letter }}</div>
+                <div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#767676;">{{ group.status }}</div>
+              </div>
+            </div>
+            <div data-list style="display:flex;flex-direction:column;gap:6px;">
+              <sc-for list="{{ group.rows }}" as="row" hint-placeholder-count="4">
+                <div data-row data-dir="{{ group.letter }}" data-index="{{ $index }}" onPointerDown="{{ onGrab }}" class="num" style="position:relative;display:flex;align-items:center;gap:11px;height:46px;padding:0 12px;background:#1c1c1c;border-left:3px solid {{ row.barColor }};border-radius:4px;cursor:{{ row.cursor }};touch-action:none;opacity:{{ row.rowOpacity }};">
+                  <span style="width:14px;font-size:13px;font-weight:700;color:#5c5c5c;">{{ row.rank }}</span>
+                  <img loading="lazy" decoding="async" src="{{ row.flag }}" alt="{{ row.name }}" style="width:26px;height:17px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.16);display:block;">
+                  <span style="flex:1;font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ row.name }}</span>
+                  <sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:{{ row.barColor }};">{{ row.statusShort }}</span></sc-if>
+                  <sc-if value="{{ showPoints }}" hint-placeholder-val="{{ true }}"><span style="font-size:11px;color:#767676;width:22px;text-align:right;">{{ row.gdText }}</span></sc-if>
+                  <sc-if value="{{ showPoints }}" hint-placeholder-val="{{ true }}"><span style="font-family:'Anton',sans-serif;font-size:18px;width:20px;text-align:right;">{{ row.pts }}</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- THIRD-PLACE RACE -->
+      <div style="margin-top:34px;background:#151515;border:1px solid #272727;border-radius:11px;padding:22px 24px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+          <div style="font-family:'Anton',sans-serif;font-size:24px;letter-spacing:.01em;">BEST THIRD-PLACED TEAMS</div>
+          <div style="font-size:12px;color:#838383;">{{ thirdsNote }}</div>
+        </div>
+        <p style="margin:0 0 16px;font-size:13px;color:#767676;max-width:760px;">In the 48-team format the four group runners-up aren't enough — the <b style="color:#9a9a9a;">eight best third-placed teams</b> also reach the Round of 32. They're ranked across all 12 groups by points, then goal difference, and slotted against group winners (never their own).</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;">
+          <sc-for list="{{ thirdsTable }}" as="t" hint-placeholder-count="12">
+            <div style="display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:8px;background:{{ t.bg }};border:1px solid {{ t.border }};">
+              <span class="num" style="font-family:'Anton',sans-serif;font-size:17px;width:20px;color:{{ t.rankColor }};">{{ t.rank }}</span>
+              <sc-if value="{{ t.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ t.flag }}" alt="" style="width:24px;height:16px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.16);"></sc-if>
+              <sc-if value="{{ t.noFlag }}" hint-placeholder-val="{{ false }}"><span style="width:24px;height:16px;border:1px dashed #3b3b3b;border-radius:2px;"></span></sc-if>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;color:{{ t.tColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.name }}</div>
+                <div style="font-size:10.5px;color:#5c5c5c;letter-spacing:.04em;">Group {{ t.group }} · {{ t.oppLabel }}</div>
+              </div>
+              <span class="num" style="font-family:'Anton',sans-serif;font-size:18px;color:{{ t.tColor }};">{{ t.pts }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ BRACKET ============ -->
+  <sc-if value="{{ isBracket }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:viewIn .35s ease both;padding:30px 0 50px;">
+      <div style="max-width:1320px;margin:0 auto;padding:0 30px 14px;">
+        <h2 style="font-family:'Anton',sans-serif;font-size:38px;line-height:.95;margin:0;letter-spacing:.01em;">THE BRACKET</h2>
+        <p style="margin:8px 0 0;color:#9a9a9a;font-size:14px;max-width:720px;text-wrap:pretty;">{{ bracketSub }}</p>
+        <sc-if value="{{ showBracketTools }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button onClick="{{ onChalk }}" style="background:#1c1c1c;border:1px solid #2e2e2e;color:#d2d2d2;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:7px;cursor:pointer;letter-spacing:.03em;">Favorites</button>
+            <button onClick="{{ onSurprise }}" style="background:#1c1c1c;border:1px solid #2e2e2e;color:#d2d2d2;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:7px;cursor:pointer;letter-spacing:.03em;">Surprise me</button>
+          </div>
+        </sc-if>
+      </div>
+      <div style="overflow-x:auto;padding:10px 30px 24px;">
+        <div style="display:flex;gap:28px;min-width:max-content;height:880px;align-items:stretch;">
+          <sc-for list="{{ rounds }}" as="rnd" hint-placeholder-count="5">
+            <div style="flex:none;width:188px;display:flex;flex-direction:column;">
+              <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#767676;font-weight:700;margin-bottom:10px;text-align:center;padding-bottom:8px;border-bottom:1px solid #272727;">{{ rnd.name }}</div>
+              <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;">
+                <sc-for list="{{ rnd.matches }}" as="m" hint-placeholder-count="4">
+                  <div style="position:relative;background:#151515;border:1px solid #272727;border-radius:6px;overflow:visible;" style-after="content:'';position:absolute;right:-28px;top:50%;width:28px;height:1px;background:#272727;">
+                    <div data-match-id="{{ m.id }}" data-team-id="{{ m.a.id }}" onClick="{{ onPick }}" class="num" style="display:flex;align-items:center;gap:8px;height:29px;padding:0 10px;cursor:{{ m.a.cursor }};background:{{ m.a.rowBg }};">
+                      <sc-if value="{{ m.a.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ m.a.flag }}" alt="" style="width:18px;height:12px;object-fit:cover;border-radius:1px;box-shadow:0 0 0 1px rgba(255,255,255,.14);opacity:{{ m.a.flagOp }};"></sc-if>
+                      <sc-if value="{{ m.a.tbd }}" hint-placeholder-val="{{ false }}"><span style="width:18px;height:12px;border:1px dashed #3b3b3b;border-radius:1px;"></span></sc-if>
+                      <span style="flex:1;font-size:12px;font-weight:{{ m.a.weight }};color:{{ m.a.tColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ m.a.name }}</span>
+                      <span style="font-size:11px;color:{{ m.a.tColor }};">{{ m.a.mark }}</span>
+                    </div>
+                    <div style="height:1px;background:#272727;"></div>
+                    <div data-match-id="{{ m.id }}" data-team-id="{{ m.b.id }}" onClick="{{ onPick }}" class="num" style="display:flex;align-items:center;gap:8px;height:29px;padding:0 10px;cursor:{{ m.b.cursor }};background:{{ m.b.rowBg }};">
+                      <sc-if value="{{ m.b.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ m.b.flag }}" alt="" style="width:18px;height:12px;object-fit:cover;border-radius:1px;box-shadow:0 0 0 1px rgba(255,255,255,.14);opacity:{{ m.b.flagOp }};"></sc-if>
+                      <sc-if value="{{ m.b.tbd }}" hint-placeholder-val="{{ false }}"><span style="width:18px;height:12px;border:1px dashed #3b3b3b;border-radius:1px;"></span></sc-if>
+                      <span style="flex:1;font-size:12px;font-weight:{{ m.b.weight }};color:{{ m.b.tColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ m.b.name }}</span>
+                      <span style="font-size:11px;color:{{ m.b.tColor }};">{{ m.b.mark }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+
+          <div style="flex:none;width:230px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;border-left:1px solid #272727;padding-left:28px;">
+            <div style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:{{ accent }};font-weight:700;">World Champion</div>
+            <div style="width:96px;height:96px;border-radius:50%;border:2px solid {{ accent }};display:flex;align-items:center;justify-content:center;background:#151515;">
+              <sc-if value="{{ champion.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ champion.flag }}" alt="" style="width:64px;height:43px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.2);"></sc-if>
+              <sc-if value="{{ champion.tbd }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Anton',sans-serif;font-size:18px;color:#5c5c5c;">TBD</span></sc-if>
+            </div>
+            <div style="font-family:'Anton',sans-serif;font-size:30px;line-height:.95;text-align:center;letter-spacing:.01em;">{{ champion.name }}</div>
+            <div style="font-size:12px;color:#767676;text-align:center;">{{ champion.sub }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ YOUR PICKS ============ -->
+  <sc-if value="{{ isPicks }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:viewIn .35s ease both;max-width:1080px;margin:0 auto;padding:30px 30px 70px;">
+      <h2 style="font-family:'Anton',sans-serif;font-size:38px;line-height:.95;margin:0 0 22px;letter-spacing:.01em;">YOUR PICKS</h2>
+
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;margin-bottom:22px;">
+        <div style="background:linear-gradient(160deg,#181818,#151515);border:1px solid #2e2e2e;border-radius:12px;padding:28px;display:flex;align-items:center;gap:24px;">
+          <div style="width:104px;height:104px;border-radius:50%;border:2px solid {{ accent }};display:flex;align-items:center;justify-content:center;flex:none;">
+            <img loading="lazy" decoding="async" src="{{ predChampion.flag }}" alt="" style="width:70px;height:47px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.2);">
+          </div>
+          <div>
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:{{ accent }};font-weight:700;margin-bottom:6px;">Predicted Champion</div>
+            <div style="font-family:'Anton',sans-serif;font-size:44px;line-height:.9;">{{ predChampion.name }}</div>
+            <div style="font-size:13px;color:#838383;margin-top:8px;">Final vs {{ predRunnerUp.name }}</div>
+          </div>
+        </div>
+        <div style="background:#151515;border:1px solid #272727;border-radius:12px;padding:24px;display:flex;flex-direction:column;justify-content:center;gap:14px;">
+          <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#767676;font-weight:700;">Your bracket</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#d2d2d2;"><span>Groups re-ordered</span><span class="num" style="font-family:'Anton',sans-serif;font-size:20px;">{{ pickStats.groups }}/12</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#d2d2d2;"><span>Knockout calls</span><span class="num" style="font-family:'Anton',sans-serif;font-size:20px;">{{ pickStats.matches }}/31</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+            <button onClick="{{ onSave }}" style="background:{{ accent }};border:none;color:#1a1505;font-family:'Archivo',sans-serif;font-weight:700;font-size:13px;padding:10px;border-radius:7px;cursor:pointer;">Save predictions</button>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{ onDownloadCard }}" style="flex:1;background:#1c1c1c;border:1px solid #2e2e2e;color:#d2d2d2;font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;padding:10px;border-radius:7px;cursor:pointer;">Download card</button>
+              <button onClick="{{ onReset }}" style="background:transparent;border:1px solid #3b3b3b;color:#9a9a9a;font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;padding:10px 14px;border-radius:7px;cursor:pointer;">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#151515;border:1px solid #272727;border-radius:12px;padding:24px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-family:'Anton',sans-serif;font-size:24px;letter-spacing:.01em;">GOLDEN BOOT</div>
+          <div style="font-size:12px;color:#838383;">Who finishes top scorer?</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;">
+          <sc-for list="{{ players }}" as="p" hint-placeholder-count="8">
+            <div data-player="{{ p.id }}" onClick="{{ onPickGolden }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:9px;cursor:pointer;background:{{ p.bg }};border:1px solid {{ p.border }};transition:background .2s,border-color .2s;">
+              <img loading="lazy" decoding="async" src="{{ p.flag }}" alt="" style="width:30px;height:20px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.16);">
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:600;color:{{ p.tColor }};">{{ p.name }}</div>
+                <div style="font-size:11px;color:#767676;">{{ p.team }}</div>
+              </div>
+              <span style="font-size:13px;color:{{ accent }};">{{ p.mark }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ COMPARE ============ -->
+  <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+    <div style="animation:viewIn .35s ease both;max-width:1080px;margin:0 auto;padding:30px 30px 70px;">
+      <h2 style="font-family:'Anton',sans-serif;font-size:38px;line-height:.95;margin:0 0 6px;letter-spacing:.01em;">PICKS vs REALITY</h2>
+      <p style="margin:0 0 22px;color:#9a9a9a;font-size:14px;max-width:640px;">Your predicted finishing order against the live group standings right now. Knockout scoring unlocks once the bracket begins.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:26px;">
+        <div style="background:#151515;border:1px solid #272727;border-radius:11px;padding:22px;">
+          <div class="num" style="font-family:'Anton',sans-serif;font-size:46px;line-height:.9;color:{{ accent }};">{{ score.exact }}<span style="font-size:20px;color:#5c5c5c;">/48</span></div>
+          <div style="font-size:12px;color:#9a9a9a;margin-top:8px;letter-spacing:.04em;">Exact positions correct</div>
+        </div>
+        <div style="background:#151515;border:1px solid #272727;border-radius:11px;padding:22px;">
+          <div class="num" style="font-family:'Anton',sans-serif;font-size:46px;line-height:.9;color:#57c98a;">{{ score.quals }}<span style="font-size:20px;color:#5c5c5c;">/24</span></div>
+          <div style="font-size:12px;color:#9a9a9a;margin-top:8px;letter-spacing:.04em;">Qualifiers called right</div>
+        </div>
+        <div style="background:#151515;border:1px solid #272727;border-radius:11px;padding:22px;">
+          <div class="num" style="font-family:'Anton',sans-serif;font-size:46px;line-height:.9;">{{ score.winners }}<span style="font-size:20px;color:#5c5c5c;">/12</span></div>
+          <div style="font-size:12px;color:#9a9a9a;margin-top:8px;letter-spacing:.04em;">Group winners nailed</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <sc-for list="{{ compareRows }}" as="c" hint-placeholder-count="12">
+          <div style="display:flex;align-items:center;gap:12px;background:#151515;border:1px solid #272727;border-radius:9px;padding:12px 14px;">
+            <span style="font-family:'Anton',sans-serif;font-size:20px;color:#3b3b3b;width:18px;">{{ c.letter }}</span>
+            <div style="flex:1;display:flex;align-items:center;gap:8px;">
+              <img loading="lazy" decoding="async" src="{{ c.predFlag }}" alt="" style="width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.14);">
+              <span style="font-size:12.5px;color:#d2d2d2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">{{ c.predName }}</span>
+            </div>
+            <span style="color:#5c5c5c;font-size:13px;">vs</span>
+            <div style="flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+              <span style="font-size:12.5px;color:#9a9a9a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">{{ c.actName }}</span>
+              <img loading="lazy" decoding="async" src="{{ c.actFlag }}" alt="" style="width:22px;height:15px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.14);">
+            </div>
+            <span style="width:22px;text-align:center;font-size:14px;font-weight:700;color:{{ c.hitColor }};">{{ c.hitMark }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#f3f3f3;color:#0a0a0a;font-size:13px;font-weight:600;padding:11px 22px;border-radius:99px;box-shadow:0 12px 40px rgba(0,0,0,.45);z-index:60;animation:toastIn .3s ease both;">{{ toast }}</div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;accentColor&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#f5b13d&quot;, &quot;tsType&quot;: &quot;string&quot; },
+  &quot;showPoints&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;showStatusLabels&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.setupData();
+    this.state = this.loadInitial();
+    this._drag = null;
+  }
+
+  setupData() {
+    // Real 2026 World Cup draw (Dec 5, 2025). [id, name, flagCode, rating, currentPts, currentGD]
+    const RAW = [
+      ['mex','Mexico','mx',76,4,2],        ['rsa','South Africa','za',66,0,-3],  ['kor','South Korea','kr',75,4,1],   ['cze','Czechia','cz',72,3,0],
+      ['can','Canada','ca',74,4,2],        ['bih','Bosnia & Herz.','ba',70,1,-1],['qat','Qatar','qa',67,0,-4],        ['sui','Switzerland','ch',80,6,3],
+      ['bra','Brazil','br',89,6,4],        ['mar','Morocco','ma',81,4,1],        ['hai','Haiti','ht',58,0,-4],        ['sco','Scotland','gb-sct',73,1,-1],
+      ['usa','United States','us',76,6,3], ['par','Paraguay','py',72,1,-2],      ['aus','Australia','au',73,3,-1],    ['tur','Türkiye','tr',78,3,0],
+      ['ger','Germany','de',85,6,3],       ['civ','Ivory Coast','ci',76,4,1],    ['ecu','Ecuador','ec',74,3,0],       ['cuw','Curaçao','cw',56,0,-4],
+      ['ned','Netherlands','nl',86,4,2],   ['swe','Sweden','se',74,3,0],         ['tun','Tunisia','tn',70,0,-3],      ['jpn','Japan','jp',80,4,1],
+      ['bel','Belgium','be',84,6,3],       ['egy','Egypt','eg',76,3,0],          ['irn','Iran','ir',75,3,-1],         ['nzl','New Zealand','nz',62,0,-3],
+      ['esp','Spain','es',92,6,4],         ['cpv','Cape Verde','cv',60,0,-5],    ['ksa','Saudi Arabia','sa',70,1,-1], ['uru','Uruguay','uy',83,4,2],
+      ['fra','France','fr',90,6,3],        ['sen','Senegal','sn',81,4,1],        ['irq','Iraq','iq',66,0,-4],         ['nor','Norway','no',78,3,-1],
+      ['arg','Argentina','ar',91,6,4],     ['alg','Algeria','dz',75,1,-1],       ['aut','Austria','at',78,4,1],       ['jor','Jordan','jo',64,0,-4],
+      ['por','Portugal','pt',87,6,3],      ['cod','DR Congo','cd',72,0,-4],      ['uzb','Uzbekistan','uz',68,1,-1],   ['col','Colombia','co',82,4,2],
+      ['eng','England','gb-eng',88,4,2],   ['cro','Croatia','hr',82,4,1],        ['gha','Ghana','gh',76,3,0],         ['pan','Panama','pa',67,0,-3],
+    ];
+    this.TEAMS = {};
+    RAW.forEach(([id,name,code,r,pts,gd]) => { this.TEAMS[id] = { id, name, code, rating:r, pts, gd, flag:'https://flagcdn.com/w80/'+code+'.png' }; });
+    this.GROUPS = {
+      A:['mex','rsa','kor','cze'], B:['can','bih','qat','sui'], C:['bra','mar','hai','sco'],
+      D:['usa','par','aus','tur'], E:['ger','civ','ecu','cuw'], F:['ned','swe','tun','jpn'],
+      G:['bel','egy','irn','nzl'], H:['esp','cpv','ksa','uru'], I:['fra','sen','irq','nor'],
+      J:['arg','alg','aut','jor'], K:['por','cod','uzb','col'], L:['eng','cro','gha','pan'],
+    };
+    this.GROUP_OF = {};
+    Object.keys(this.GROUPS).forEach(g => this.GROUPS[g].forEach(id => this.GROUP_OF[id] = g));
+    // how many positions are mathematically confirmed in LIVE mode (demo state, mid-tournament)
+    this.LOCKED = { A:4,B:4,C:4,D:4,E:4,F:4,G:4,H:4,I:4,J:2,K:4,L:0 };
+    // ---- Official Round of 32 (matches 73–88) + knockout tree, per the FIFA 2026 schedule ----
+    // Third-place slots carry the exact group-letter options FIFA pre-assigned to each fixture.
+    this.R32_DEF = [
+      { id:'m73', a:{t:'R',g:'A'}, b:{t:'R',g:'B'} },
+      { id:'m75', a:{t:'W',g:'F'}, b:{t:'R',g:'C'} },
+      { id:'m74', a:{t:'W',g:'E'}, b:{t:'3',opts:['A','B','C','D','F']} },
+      { id:'m77', a:{t:'W',g:'I'}, b:{t:'3',opts:['C','D','F','G','H']} },
+      { id:'m76', a:{t:'W',g:'C'}, b:{t:'R',g:'F'} },
+      { id:'m78', a:{t:'R',g:'E'}, b:{t:'R',g:'I'} },
+      { id:'m79', a:{t:'W',g:'A'}, b:{t:'3',opts:['C','E','F','H','I']} },
+      { id:'m80', a:{t:'W',g:'B'}, b:{t:'3',opts:['E','F','G','I','J']} },
+      { id:'m83', a:{t:'R',g:'K'}, b:{t:'R',g:'L'} },
+      { id:'m84', a:{t:'W',g:'H'}, b:{t:'R',g:'J'} },
+      { id:'m81', a:{t:'W',g:'D'}, b:{t:'3',opts:['B','E','F','I','J']} },
+      { id:'m82', a:{t:'W',g:'G'}, b:{t:'3',opts:['A','E','H','I','J']} },
+      { id:'m86', a:{t:'W',g:'J'}, b:{t:'R',g:'H'} },
+      { id:'m88', a:{t:'R',g:'D'}, b:{t:'R',g:'G'} },
+      { id:'m85', a:{t:'W',g:'L'}, b:{t:'3',opts:['E','H','I','J','K']} },
+      { id:'m87', a:{t:'W',g:'K'}, b:{t:'3',opts:['D','E','I','J','L']} },
+    ];
+    this.KO_DEF = [
+      { key:'r16', name:'Round of 16', matches:[
+        {id:'m90',a:'m73',b:'m75'},{id:'m89',a:'m74',b:'m77'},
+        {id:'m91',a:'m76',b:'m78'},{id:'m92',a:'m79',b:'m80'},
+        {id:'m93',a:'m83',b:'m84'},{id:'m94',a:'m81',b:'m82'},
+        {id:'m95',a:'m86',b:'m88'},{id:'m96',a:'m85',b:'m87'},
+      ]},
+      { key:'qf', name:'Quarter-finals', matches:[
+        {id:'m97',a:'m89',b:'m90'},{id:'m99',a:'m91',b:'m92'},
+        {id:'m98',a:'m93',b:'m94'},{id:'m100',a:'m95',b:'m96'},
+      ]},
+      { key:'sf', name:'Semi-finals', matches:[
+        {id:'m101',a:'m97',b:'m98'},{id:'m102',a:'m99',b:'m100'},
+      ]},
+      { key:'final', name:'Final', matches:[ {id:'m104',a:'m101',b:'m102'} ]},
+    ];
+    // derive third-slot metadata (which group winner each slot faces) + next-match pointers
+    this.THIRD_SLOTS = [];
+    this.THIRD_SLOT_WG = {};
+    this.R32_DEF.forEach(d => {
+      const wSide = d.a.t === 'W' ? d.a : (d.b.t === 'W' ? d.b : null);
+      [d.a, d.b].forEach(s => { if (s.t === '3') { this.THIRD_SLOTS.push({ id:d.id, opts:s.opts }); this.THIRD_SLOT_WG[d.id] = wSide ? wSide.g : '?'; } });
+    });
+    this.NEXT = {};
+    this.KO_DEF.forEach(rd => rd.matches.forEach(md => { this.NEXT[md.a] = md.id; this.NEXT[md.b] = md.id; }));
+    this.PLAYERS = [
+      { id:'mbappe', name:'Kylian Mbappé', team:'France', code:'fr' },
+      { id:'haaland', name:'Erling Haaland', team:'Norway', code:'no' },
+      { id:'vini', name:'Vinícius Júnior', team:'Brazil', code:'br' },
+      { id:'kane', name:'Harry Kane', team:'England', code:'gb-eng' },
+      { id:'lautaro', name:'Lautaro Martínez', team:'Argentina', code:'ar' },
+      { id:'yamal', name:'Lamine Yamal', team:'Spain', code:'es' },
+      { id:'ronaldo', name:'Cristiano Ronaldo', team:'Portugal', code:'pt' },
+      { id:'wirtz', name:'Florian Wirtz', team:'Germany', code:'de' },
+    ];
+    // Real group fixtures (same-group meetings)
+    this.FIXTURES = [
+      { a:'esp', b:'ksa', sa:2, sb:0, status:'LIVE', info:"74'" },
+      { a:'bel', b:'irn', sa:1, sb:1, status:'LIVE', info:"68'" },
+      { a:'usa', b:'aus', sa:0, sb:0, status:'UP', info:'20:00' },
+      { a:'uzb', b:'col', sa:0, sb:0, status:'UP', info:'20:00' },
+      { a:'bra', b:'hai', sa:3, sb:0, status:'FT', info:'FT' },
+      { a:'mex', b:'rsa', sa:2, sb:1, status:'FT', info:'FT' },
+      { a:'eng', b:'cro', sa:1, sb:1, status:'FT', info:'FT' },
+      { a:'fra', b:'sen', sa:2, sb:0, status:'FT', info:'FT' },
+      { a:'ger', b:'civ', sa:2, sb:1, status:'FT', info:'FT' },
+      { a:'tun', b:'jpn', sa:0, sb:1, status:'FT', info:'FT' },
+    ];
+    this.KEY = 'wc26-predictor-v3';
+  }
+
+  defaultOrders() {
+    const o = {};
+    Object.keys(this.GROUPS).forEach(g => { o[g] = [...this.GROUPS[g]].sort((a,b) => this.TEAMS[b].rating - this.TEAMS[a].rating); });
+    return o;
+  }
+  loadInitial() {
+    const def = { view:'groups', mode:'predict', orders:this.defaultOrders(), picks:{}, golden:null, toast:'', updatedAt:Date.now(), feed:'idle' };
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (raw) { const p = JSON.parse(raw); return { ...def, mode:p.mode||'predict', orders:{ ...def.orders, ...(p.orders||{}) }, picks:p.picks||{}, golden:p.golden ?? null }; }
+    } catch (e) {}
+    return def;
+  }
+  persist() {
+    try { localStorage.setItem(this.KEY, JSON.stringify({ mode:this.state.mode, orders:this.state.orders, picks:this.state.picks, golden:this.state.golden })); } catch (e) {}
+  }
+  toast(msg) { this.setState({ toast: msg }); clearTimeout(this._toastT); this._toastT = setTimeout(() => this.setState({ toast:'' }), 2200); }
+
+  onNav = (e) => { this.setState({ view: e.currentTarget.dataset.key }); };
+  onMode = (e) => { this.setState({ mode: e.currentTarget.dataset.mode }, () => this.persist()); };
+
+  // ---- LIVE DATA SEAM ----
+  // Live results come from the public-domain openfootball/worldcup.json dataset (no API key, CORS-enabled).
+  // fetchLiveData() adapts it into { teams:{id:{pts,gd}}, fixtures, locked, updatedAt }; everything downstream
+  // (standings sort, third-place ranking, bracket seeding) recomputes automatically. The embedded snapshot in
+  // setupData() stays as the offline fallback, so Predict mode works with zero network.
+  componentDidMount() { this.refreshLive(); }
+
+  // Try the GitHub raw mirror first, then jsDelivr, so a single CDN hiccup doesn't take the feed down.
+  async fetchJSON(file) {
+    const sources = [
+      'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/' + file,
+      'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026/' + file,
+    ];
+    let lastErr;
+    for (const url of sources) {
+      try { const r = await fetch(url, { cache: 'no-store' }); if (r.ok) return await r.json(); lastErr = new Error('HTTP ' + r.status); }
+      catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('fetch failed: ' + file);
+  }
+
+  async fetchLiveData() {
+    const [teamsRaw, data] = await Promise.all([
+      this.fetchJSON('worldcup.teams.json'),
+      this.fetchJSON('worldcup.json'),
+    ]);
+    // openfootball team name -> our team id (ids are the lowercased FIFA code, e.g. MEX -> mex)
+    const nameToId = {};
+    (teamsRaw || []).forEach(t => {
+      const id = String(t.fifa_code || '').toLowerCase();
+      if (!this.TEAMS[id]) return;
+      nameToId[t.name] = id;
+      if (t.name_normalised) nameToId[t.name_normalised] = id;
+    });
+    Object.values(this.TEAMS).forEach(t => { if (!nameToId[t.name]) nameToId[t.name] = t.id; });
+
+    const stat = {}; Object.keys(this.TEAMS).forEach(id => stat[id] = { pts: 0, gd: 0 });
+    const groupPlayed = {}; Object.keys(this.GROUPS).forEach(g => groupPlayed[g] = 0);
+    const groupMatches = [];
+    (data.matches || []).forEach(m => {
+      const g = String(m.group || '').replace(/^Group\s+/i, '').trim();
+      if (!this.GROUPS[g]) return; // group stage only
+      const a = nameToId[m.team1], b = nameToId[m.team2];
+      if (!a || !b) return;
+      const ft = m.score && m.score.ft;
+      const played = Array.isArray(ft) && ft.length === 2;
+      if (played) {
+        const sa = ft[0], sb = ft[1];
+        stat[a].gd += sa - sb; stat[b].gd += sb - sa;
+        stat[a].pts += sa > sb ? 3 : sa === sb ? 1 : 0;
+        stat[b].pts += sb > sa ? 3 : sa === sb ? 1 : 0;
+        groupPlayed[g]++;
+      }
+      groupMatches.push({ g, a, b, sa: played ? ft[0] : null, sb: played ? ft[1] : null, played, date: m.date || '', time: m.time || '' });
+    });
+
+    const teams = {}; Object.keys(stat).forEach(id => teams[id] = { pts: stat[id].pts, gd: stat[id].gd });
+    const locked = {}; Object.keys(this.GROUPS).forEach(g => locked[g] = groupPlayed[g] >= 6 ? 4 : 0);
+    const fixtures = this.buildLiveFixtures(groupMatches);
+    return { teams, fixtures, locked, updatedAt: Date.now() };
+  }
+
+  // A scrolling window of the most recent results plus the next kickoffs for the ticker.
+  buildLiveFixtures(groupMatches) {
+    const fmtTime = (t) => { const m = String(t).match(/(\d{1,2}:\d{2})/); return m ? m[1] : 'TBD'; };
+    const done = groupMatches.filter(m => m.played).sort((x, y) => (x.date < y.date ? 1 : -1));
+    const next = groupMatches.filter(m => !m.played).sort((x, y) => (x.date < y.date ? -1 : 1));
+    const pick = [...done.slice(0, 7).reverse(), ...next.slice(0, 7)];
+    return pick.map(m => m.played
+      ? { a: m.a, b: m.b, sa: m.sa, sb: m.sb, status: 'FT', info: 'FT' }
+      : { a: m.a, b: m.b, sa: 0, sb: 0, status: 'UP', info: fmtTime(m.time) });
+  }
+
+  applyLive(data) {
+    if (!data) return;
+    if (data.teams) Object.keys(data.teams).forEach(id => {
+      if (this.TEAMS[id]) { this.TEAMS[id].pts = data.teams[id].pts; this.TEAMS[id].gd = data.teams[id].gd; }
+    });
+    if (Array.isArray(data.fixtures) && data.fixtures.length) this.FIXTURES = data.fixtures;
+    if (data.locked) this.LOCKED = data.locked;
+    this.setState({ updatedAt: data.updatedAt || Date.now(), feed: 'live' });
+  }
+
+  refreshLive() {
+    this.setState({ feed: 'loading' });
+    return this.fetchLiveData()
+      .then(d => this.applyLive(d))
+      .catch(e => { console.warn('[wc26] live feed unavailable, using embedded snapshot:', e && e.message); this.setState({ feed: 'offline' }); });
+  }
+
+  onRefresh = () => {
+    this.setState({ feed: 'loading' });
+    this.fetchLiveData()
+      .then(d => { this.applyLive(d); this.toast('Standings refreshed'); })
+      .catch(e => { console.warn('[wc26] live feed unavailable:', e && e.message); this.setState({ feed: 'offline' }); this.toast('Feed offline — showing demo data'); });
+  };
+
+  actualOrder(g) {
+    const T = this.TEAMS;
+    return [...this.GROUPS[g]].sort((a,b) => T[b].pts-T[a].pts || T[b].gd-T[a].gd || T[b].rating-T[a].rating);
+  }
+
+  // ---------- group drag ----------
+  onGrab = (e) => {
+    if (this.state.mode !== 'predict') return;
+    if (e.button === 1 || e.button === 2) return;
+    const row = e.currentTarget;
+    const dir = row.dataset.dir, fromIndex = +row.dataset.index;
+    const list = row.closest('[data-list]'); if (!list) return;
+    const rows = Array.from(list.querySelectorAll('[data-row]'));
+    const rects = rows.map(r => r.getBoundingClientRect());
+    const h = rows.length > 1 ? (rects[1].top - rects[0].top) : rects[0].height;
+    try { row.setPointerCapture(e.pointerId); } catch (err) {}
+    this._drag = { dir, fromIndex, toIndex:fromIndex, rows, h, startY:e.clientY, row };
+    row.style.transition='none'; row.style.zIndex='50'; row.style.transform='scale(1.03)'; row.style.cursor='grabbing'; row.style.boxShadow='0 18px 40px rgba(0,0,0,.5)';
+    document.body.style.userSelect='none';
+    document.addEventListener('pointermove', this._onMove);
+    document.addEventListener('pointerup', this._onUp);
+    e.preventDefault();
+  };
+  _onMove = (e) => {
+    const d = this._drag; if (!d) return;
+    const dy = e.clientY - d.startY;
+    let to = d.fromIndex + Math.round(dy / d.h);
+    to = Math.max(0, Math.min(d.rows.length - 1, to)); d.toIndex = to;
+    d.row.style.transform = `translateY(${dy}px) scale(1.03)`;
+    d.rows.forEach((r, i) => {
+      if (i === d.fromIndex) return;
+      r.style.transition = 'transform .2s cubic-bezier(.2,.85,.25,1)';
+      let shift = 0;
+      if (d.fromIndex < to && i > d.fromIndex && i <= to) shift = -d.h;
+      else if (d.fromIndex > to && i < d.fromIndex && i >= to) shift = d.h;
+      r.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  };
+  _onUp = () => {
+    const d = this._drag; if (!d) return;
+    document.removeEventListener('pointermove', this._onMove);
+    document.removeEventListener('pointerup', this._onUp);
+    document.body.style.userSelect = '';
+    d.rows.forEach(r => { r.style.transition=''; r.style.transform=''; r.style.zIndex=''; r.style.boxShadow=''; r.style.cursor=''; });
+    this._drag = null;
+    if (d.toIndex !== d.fromIndex) {
+      this.setState(s => {
+        const order = [...s.orders[d.dir]];
+        const [m] = order.splice(d.fromIndex, 1); order.splice(d.toIndex, 0, m);
+        return { orders: { ...s.orders, [d.dir]: order } };
+      }, () => this.persist());
+    }
+  };
+
+  // ---------- bracket ----------
+  resolveWinner(a, b, id) {
+    const pick = this.state.picks[id];
+    if (pick === a.id) return a;
+    if (pick === b.id) return b;
+    return a.rating >= b.rating ? a : b;
+  }
+  // Match the 8 qualifying thirds to FIFA's pre-set R32 slots (each slot allows only certain groups).
+  assignThirds(top8) {
+    const slots = this.THIRD_SLOTS, res = {}, used = {};
+    const bt = (k) => {
+      if (k === top8.length) return true;
+      const t = top8[k];
+      for (const s of slots) {
+        if (used[s.id] || !s.opts.includes(t.group)) continue;
+        used[s.id] = true; res[s.id] = t;
+        if (bt(k + 1)) return true;
+        used[s.id] = false; delete res[s.id];
+      }
+      return false;
+    };
+    bt(0);
+    return res;
+  }
+
+  computeBracket(mode) {
+    const T = this.TEAMS;
+    const getPos = (g, pos) => {
+      if (mode === 'predict') return { team: T[this.state.orders[g][pos]] };
+      if (pos < this.LOCKED[g]) return { team: T[this.actualOrder(g)[pos]] };
+      return { tbd:true, label:(pos + 1) + g };
+    };
+    const allThirdsKnown = mode === 'predict' || Object.keys(this.GROUPS).every(g => this.LOCKED[g] >= 3);
+    let assignMap = {}, teamToSlot = {}, rankedThirds = [];
+    if (allThirdsKnown) {
+      rankedThirds = Object.keys(this.GROUPS).map(g => {
+        const id = mode === 'predict' ? this.state.orders[g][2] : this.actualOrder(g)[2];
+        return { team: T[id], group: g };
+      }).sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || y.team.rating-x.team.rating);
+      assignMap = this.assignThirds(rankedThirds.slice(0, 8));
+      Object.keys(assignMap).forEach(mid => { teamToSlot[assignMap[mid].team.id] = this.THIRD_SLOT_WG[mid]; });
+    }
+    const getThird = (mid) => assignMap[mid] ? { team: assignMap[mid].team } : { tbd:true, label:'Best 3rd' };
+    const resolveSide = (side, mid) => side.t === 'W' ? getPos(side.g,0) : side.t === 'R' ? getPos(side.g,1) : getThird(mid);
+
+    const r32 = this.R32_DEF.map(d => ({ id:d.id, a:resolveSide(d.a, d.id), b:resolveSide(d.b, d.id) }));
+    const winner = (m) => {
+      if (mode === 'live') return { tbd:true, label:'TBD' };
+      if (m.a.tbd || m.b.tbd) return { tbd:true, label:'TBD' };
+      return { team: this.resolveWinner(m.a.team, m.b.team, m.id) };
+    };
+    const resultById = {};
+    r32.forEach(m => { resultById[m.id] = winner(m); });
+    const raw = [{ key:'r32', name:'Round of 32', matches:r32 }];
+    this.KO_DEF.forEach(rd => {
+      const matches = rd.matches.map(md => ({ id:md.id, a:resultById[md.a] || { tbd:true, label:'TBD' }, b:resultById[md.b] || { tbd:true, label:'TBD' } }));
+      matches.forEach(m => { resultById[m.id] = winner(m); });
+      raw.push({ key:rd.key, name:rd.name, matches });
+    });
+    const fm = raw[raw.length - 1].matches[0];
+    const champion = resultById[fm.id] || { tbd:true, label:'TBD' };
+    let runnerUp = { tbd:true, label:'TBD' };
+    if (mode === 'predict' && !fm.a.tbd && !fm.b.tbd && champion.team) runnerUp = champion.team.id === fm.a.team.id ? { team:fm.b.team } : { team:fm.a.team };
+    return { raw, champion, runnerUp, rankedThirds, teamToSlot, allThirdsKnown };
+  }
+
+  slotView(side, isWin, mode) {
+    if (side.tbd) return { id:'', name:side.label, flag:'', hasFlag:false, tbd:true, rowBg:'transparent', tColor:'#5c5c5c', weight:'500', flagOp:'1', mark:'', cursor:'default' };
+    const t = side.team;
+    return {
+      id:t.id, name:t.name, flag:t.flag, hasFlag:true, tbd:false,
+      rowBg: isWin ? 'rgba(87,201,138,.14)' : 'transparent',
+      tColor: isWin ? '#eafef0' : '#838383',
+      weight: isWin ? '700' : '500', flagOp: isWin ? '1' : '.5',
+      mark: isWin ? '✓' : '', cursor: mode === 'predict' ? 'pointer' : 'default',
+    };
+  }
+  matchView(m, mode) {
+    let aWin = false, bWin = false;
+    if (mode === 'predict' && !m.a.tbd && !m.b.tbd) {
+      const w = this.resolveWinner(m.a.team, m.b.team, m.id);
+      aWin = w.id === m.a.team.id; bWin = !aWin;
+    }
+    return { id:m.id, a:this.slotView(m.a, aWin, mode), b:this.slotView(m.b, bWin, mode) };
+  }
+
+  onPick = (e) => {
+    if (this.state.mode !== 'predict') return;
+    const row = e.currentTarget, mid = row.dataset.matchId, tid = row.dataset.teamId;
+    if (!tid) return;
+    this.setState(s => ({ picks: { ...s.picks, [mid]: tid } }), () => { this.persist(); this.animateAdvance(mid, tid); });
+  };
+  animateAdvance(matchId, teamId) {
+    const cur = document.querySelector(`[data-match-id="${matchId}"][data-team-id="${teamId}"]`);
+    if (cur) cur.animate([{ transform:'scale(1.05)' }, { transform:'scale(1)' }], { duration:240, easing:'cubic-bezier(.2,.8,.2,1)' });
+    const nextId = this.NEXT[matchId];
+    if (!nextId) return;
+    requestAnimationFrame(() => {
+      const slot = document.querySelector(`[data-match-id="${nextId}"][data-team-id="${teamId}"]`);
+      if (slot) slot.animate([{ opacity:.12, transform:'translateX(-12px)' }, { opacity:1, transform:'none' }], { duration:430, easing:'cubic-bezier(.2,.8,.2,1)' });
+    });
+  }
+
+  onPickGolden = (e) => { const id = e.currentTarget.dataset.player; this.setState(s => ({ golden: s.golden === id ? null : id }), () => this.persist()); };
+  onSave = () => { this.persist(); this.toast('Predictions saved'); };
+  onReset = () => { this.setState({ orders:this.defaultOrders(), picks:{}, golden:null }, () => { this.persist(); this.toast('Reset to seeding'); }); };
+  onShare = () => {
+    const { champion } = this.computeBracket('predict');
+    const g = this.state.golden ? (this.PLAYERS.find(p => p.id === this.state.golden) || {}).name : '—';
+    const text = ['My World Cup 2026 prediction', 'Champion: ' + (champion.team ? champion.team.name : '—'), 'Golden Boot: ' + g].join('\n');
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => this.toast('Copied to clipboard'), () => this.toast('Copied to clipboard'));
+      else this.toast('Copied to clipboard');
+    } catch (e) { this.toast('Copied to clipboard'); }
+  };
+
+  // ---------- quick-fill ----------
+  predictR32Sides() {
+    const T = this.TEAMS;
+    const ranked = Object.keys(this.GROUPS).map(g => ({ team:T[this.state.orders[g][2]], group:g }))
+      .sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || y.team.rating-x.team.rating);
+    const assignMap = this.assignThirds(ranked.slice(0, 8));
+    const getPos = (g, pos) => T[this.state.orders[g][pos]];
+    const side = (s, mid) => s.t === 'W' ? getPos(s.g,0) : s.t === 'R' ? getPos(s.g,1) : (assignMap[mid] ? assignMap[mid].team : null);
+    return this.R32_DEF.map(d => ({ id:d.id, a:side(d.a, d.id), b:side(d.b, d.id) }));
+  }
+  simulate(chooser) {
+    const picks = {}, resultById = {};
+    const winner = (m) => { const w = chooser(m.a, m.b); picks[m.id] = w.id; return w; };
+    this.predictR32Sides().forEach(m => { resultById[m.id] = winner(m); });
+    this.KO_DEF.forEach(rd => rd.matches.forEach(md => {
+      resultById[md.id] = winner({ id:md.id, a:resultById[md.a], b:resultById[md.b] });
+    }));
+    return picks;
+  }
+  onChalk = () => { this.setState({ picks:{} }, () => { this.persist(); this.toast('Reset to favorites'); }); };
+  onSurprise = () => { const picks = this.simulate((a,b) => Math.random() < 0.5 ? a : b); this.setState({ picks }, () => { this.persist(); this.toast('Bracket randomised'); }); };
+
+  // ---------- share card ----------
+  onDownloadCard = () => {
+    const { champion, runnerUp } = this.computeBracket('predict');
+    const cName = champion.team ? champion.team.name : '—';
+    const rName = runnerUp.team ? runnerUp.team.name : '—';
+    const gp = this.state.golden ? (this.PLAYERS.find(p => p.id === this.state.golden) || {}) : null;
+    const W = 1200, H = 630;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#f5b13d'; x.lineWidth = 3; x.strokeRect(26, 26, W-52, H-52);
+    x.fillStyle = '#f5b13d'; x.font = '700 22px Archivo, sans-serif'; x.textBaseline = 'alphabetic';
+    x.fillText('WORLD CUP 2026  ·  MY PREDICTION', 64, 96);
+    x.fillStyle = '#767676'; x.font = '600 20px Archivo, sans-serif';
+    x.fillText('CHAMPION', 64, 210);
+    x.fillStyle = '#f3f3f3'; x.font = '96px Anton, sans-serif';
+    x.fillText(cName.toUpperCase(), 60, 300);
+    x.strokeStyle = '#1c1c1c'; x.lineWidth = 1; x.beginPath(); x.moveTo(64, 360); x.lineTo(W-64, 360); x.stroke();
+    x.fillStyle = '#767676'; x.font = '600 18px Archivo, sans-serif'; x.fillText('RUNNER-UP', 64, 430);
+    x.fillStyle = '#d2d2d2'; x.font = '700 40px Archivo, sans-serif'; x.fillText(rName, 64, 478);
+    x.fillStyle = '#767676'; x.font = '600 18px Archivo, sans-serif'; x.fillText('GOLDEN BOOT', 620, 430);
+    x.fillStyle = '#d2d2d2'; x.font = '700 40px Archivo, sans-serif'; x.fillText(gp ? gp.name : 'Undecided', 620, 478);
+    x.fillStyle = '#f5b13d'; x.font = '700 16px Archivo, sans-serif'; x.fillText('WC26 PREDICTOR', 64, H-54);
+    try {
+      const url = cv.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = 'wc26-prediction.png'; a.click();
+      this.toast('Card downloaded');
+    } catch (e) { this.toast('Could not export'); }
+  };
+
+  // ---------- group rows ----------
+  buildGroup(mode, g) {
+    const sign = (n) => (n > 0 ? '+' : '') + n;
+    const T = this.TEAMS;
+    if (mode === 'predict') {
+      const acc = { q:'#57c98a', p:'#f5b13d', o:'rgba(255,255,255,.3)' };
+      const lab = ['1ST','2ND','3RD','4TH'];
+      return this.state.orders[g].map((id, i) => {
+        const t = T[id]; const k = i < 2 ? 'q' : i === 2 ? 'p' : 'o';
+        return { id, name:t.name, flag:t.flag, pts:t.pts, gdText:sign(t.gd), rank:i+1, barColor:acc[k], statusShort:lab[i], rowOpacity: i===3?0.55:1, cursor:'grab' };
+      });
+    }
+    const order = this.actualOrder(g), locked = this.LOCKED[g];
+    return order.map((id, i) => {
+      const t = T[id]; const conf = i < locked;
+      let barColor = 'rgba(255,255,255,.3)', label = 'TBD';
+      if (i < 2) { barColor = conf ? '#57c98a' : 'rgba(255,255,255,.3)'; label = conf ? 'Q' : 'TBD'; }
+      else if (i === 2) { barColor = conf ? '#f5b13d' : 'rgba(255,255,255,.3)'; label = conf ? '3RD' : 'TBD'; }
+      else { label = conf ? 'OUT' : 'TBD'; }
+      return { id, name:t.name, flag:t.flag, pts:t.pts, gdText:sign(t.gd), rank:i+1, barColor, statusShort:label, rowOpacity:1, cursor:'default' };
+    });
+  }
+
+  buildThirdsTable(mode, info) {
+    const T = this.TEAMS;
+    if (info.allThirdsKnown) {
+      return info.rankedThirds.map((o, i) => {
+        const t = o.team, q = i < 8, wg = info.teamToSlot[t.id];
+        return {
+          rank:String(i+1), name:t.name, flag:t.flag, hasFlag:true, noFlag:false, group:o.group, pts:t.pts, qualifies:q,
+          oppLabel: (q && wg) ? ('plays 1' + wg) : 'eliminated',
+          bg: q ? 'rgba(87,201,138,.10)' : '#1c1c1c', border: q ? 'rgba(87,201,138,.4)' : '#272727',
+          tColor: q ? '#eafef0' : '#6e6e6e', rankColor: q ? '#57c98a' : '#5c5c5c',
+        };
+      });
+    }
+    const rows = [], known = [];
+    Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] >= 3) known.push({ team:T[this.actualOrder(g)[2]], group:g }); });
+    known.sort((a,b) => b.team.pts-a.team.pts || b.team.gd-a.team.gd);
+    known.forEach((o, i) => rows.push({ rank:String(i+1), name:o.team.name, flag:o.team.flag, hasFlag:true, noFlag:false, group:o.group, pts:o.team.pts, oppLabel:'provisional', bg:'#1c1c1c', border:'#272727', tColor:'#d2d2d2', rankColor:'#5c5c5c' }));
+    Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] < 3) rows.push({ rank:'–', name:'Group ' + g + ' third', flag:'', hasFlag:false, noFlag:true, group:g, pts:'–', oppLabel:'not yet decided', bg:'#151515', border:'#242424', tColor:'#5c5c5c', rankColor:'#3b3b3b' }); });
+    return rows;
+  }
+
+  renderVals() {
+    const v = this.state.view, mode = this.state.mode;
+    const accent = this.props.accentColor || '#f5b13d';
+    const showPoints = this.props.showPoints !== false;
+    const showLabels = this.props.showStatusLabels !== false;
+    const T = this.TEAMS;
+    const tv = (id) => ({ name:T[id].name, flag:T[id].flag });
+    const feed = this.state.feed;
+    const mins = Math.max(0, Math.round((Date.now() - (this.state.updatedAt || Date.now())) / 60000));
+    const updatedLabel = feed === 'offline' ? 'demo data · feed offline'
+      : feed === 'loading' ? 'updating…'
+      : mins < 1 ? 'updated just now' : ('updated ' + mins + 'm ago');
+    const feedLabel = feed === 'offline' ? 'Demo data' : 'Group stage';
+
+    const tabs = [['groups','Groups'],['bracket','Bracket'],['picks','Your Picks'],['compare','Compare']].map(([key,label]) => ({
+      key, label, active:v===key, color:v===key?accent:'#838383', under:v===key?accent:'transparent',
+    }));
+    const isLive = mode === 'live';
+
+    const info = this.computeBracket(mode);
+    const predInfo = this.computeBracket('predict');
+
+    const statusMap = { A:'', B:'', C:'', D:'', E:'', F:'', G:'', H:'', I:'', J:'', K:'', L:'' };
+    const groupViews = Object.keys(this.GROUPS).map(g => {
+      const lk = this.LOCKED[g];
+      const status = isLive ? (lk >= 4 ? 'Final standings' : lk >= 1 ? 'In progress · '+lk+' confirmed' : 'Kicking off · open') : 'Drag to predict';
+      return { letter:g, status, rows:this.buildGroup(mode, g) };
+    });
+
+    const rounds = info.raw.map(r => ({ key:r.key, name:r.name, matches:r.matches.map(m => this.matchView(m, mode)) }));
+    const champView = (c, predRunnerUp) => {
+      if (c.tbd || !c.team) return { name:'TBD', flag:'', hasFlag:false, tbd:true, sub:'Decided in July' };
+      return { name:c.team.name, flag:c.team.flag, hasFlag:true, tbd:false, sub: predRunnerUp ? ('def. ' + (predRunnerUp.team ? predRunnerUp.team.name : 'TBD') + ' in the final') : 'lifts the trophy' };
+    };
+    const champion = isLive ? { name:'TBD', flag:'', hasFlag:false, tbd:true, sub:'Knockout begins July 4' } : champView(info.champion, info.runnerUp);
+    const predChampion = predInfo.champion.team ? { name:predInfo.champion.team.name, flag:predInfo.champion.team.flag } : { name:'—', flag:'' };
+    const predRunnerUp = predInfo.runnerUp.team ? { name:predInfo.runnerUp.team.name, flag:predInfo.runnerUp.team.flag } : { name:'—', flag:'' };
+
+    const thirdsTable = this.buildThirdsTable(mode, info);
+
+    const players = this.PLAYERS.map(p => {
+      const sel = this.state.golden === p.id;
+      return { id:p.id, name:p.name, team:p.team, flag:'https://flagcdn.com/w80/'+p.code+'.png',
+        bg: sel ? 'rgba(245,177,61,.14)' : '#1c1c1c', border: sel ? accent : '#272727', tColor: sel ? '#f3f3f3' : '#d2d2d2', mark: sel ? '✓' : '' };
+    });
+
+    let exact = 0, quals = 0, winners = 0;
+    const compareRows = Object.keys(this.GROUPS).map(g => {
+      const pred = this.state.orders[g], act = this.actualOrder(g);
+      for (let i = 0; i < 4; i++) if (pred[i] === act[i]) exact++;
+      const top2 = new Set([pred[0], pred[1]]);
+      if (top2.has(act[0])) quals++; if (top2.has(act[1])) quals++;
+      const winHit = pred[0] === act[0]; if (winHit) winners++;
+      return { letter:g, predName:tv(pred[0]).name, predFlag:tv(pred[0]).flag, actName:tv(act[0]).name, actFlag:tv(act[0]).flag, hitMark: winHit?'✓':'✕', hitColor: winHit?'#57c98a':'#9a4a44' };
+    });
+    const def = this.defaultOrders();
+    const pickStats = { groups: Object.keys(this.GROUPS).filter(g => this.state.orders[g].join() !== def[g].join()).length, matches: Object.keys(this.state.picks).length };
+
+    const fixtures = this.FIXTURES
+      .filter(f => this.GROUP_OF[f.a] === this.GROUP_OF[f.b])
+      .map(f => {
+        const A = T[f.a], B = T[f.b], up = f.status === 'UP';
+        return {
+          aFlag:A.flag, bFlag:B.flag, aAbbr:f.a.toUpperCase(), bAbbr:f.b.toUpperCase(),
+          group:'Group ' + this.GROUP_OF[f.a],
+          score: up ? 'vs' : (f.sa + '–' + f.sb),
+          statusText: f.status === 'FT' ? 'FT' : f.info,
+          statusColor: f.status === 'LIVE' ? '#ff5a4d' : f.status === 'FT' ? '#767676' : accent,
+        };
+      });
+
+    return {
+      accent, showPoints, showLabels, tabs,
+      liveBg: isLive ? '#353535' : 'transparent', liveColor: isLive ? '#f3f3f3' : '#767676', liveDot: isLive ? '#ff5a4d' : '#5c5c5c',
+      predBg: !isLive ? accent : 'transparent', predColor: !isLive ? '#1a1505' : '#767676',
+      isGroups:v==='groups', isBracket:v==='bracket', isPicks:v==='picks', isCompare:v==='compare',
+      groupSub: isLive ? 'Live standings from the feed. Drag is locked — positions confirm (Q / OUT) as matches finish; the rest stay TBD.' : 'Drag teams to set your predicted finishing order. The bracket re-slots instantly — including who each best-third faces. Points shown are live.',
+      bracketSub: isLive ? 'The real fixture tree. Confirmed group positions are placed; everything still undecided — and every best-third slot — shows TBD until results land.' : 'Seeded from your group picks using the official slotting (winners, runners-up, and eight best thirds). Click a team to send them through; your pick advances up the bracket.',
+      groupViews,
+      thirdsTable, thirdsNote: info.allThirdsKnown ? 'Top 8 advance · ranked by points, then GD' : 'Provisional — locks once every group is complete',
+      rounds, champion,
+      predChampion, predRunnerUp, players,
+      compareRows, score:{ exact, quals, winners }, pickStats,
+      fixtures, showBracketTools: !isLive, updatedLabel, feedLabel,
+      toast:this.state.toast,
+      onNav:this.onNav, onMode:this.onMode, onGrab:this.onGrab, onPick:this.onPick, onPickGolden:this.onPickGolden, onSave:this.onSave, onShare:this.onShare, onReset:this.onReset,
+      onChalk:this.onChalk, onSurprise:this.onSurprise, onDownloadCard:this.onDownloadCard, onRefresh:this.onRefresh,
+    };
+  }
+}
+</script>
+</body>
+</html>

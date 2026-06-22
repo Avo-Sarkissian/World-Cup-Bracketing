@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+.thumbnail
+
+# Original artifact bundle (source lives unpacked at the repo root)
+*.zip
+extracted/
+
+# Local dev / editor
+.claude/
+node_modules/
