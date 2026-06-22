@@ -12,6 +12,10 @@
 <meta property="og:description" content="Predict the 2026 World Cup bracket. Live group standings, FIFA best-third slotting, shareable picks.">
 <meta property="og:image" content="https://avo-sarkissian.github.io/World-Cup-Bracketing/screens/bracket.png">
 <meta name="twitter:card" content="summary_large_image">
+<!-- React/ReactDOM are vendored locally so the app never depends on an external CDN to boot.
+     support.js detects window.React is already set and skips its own CDN load. -->
+<script src="./vendor/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="./vendor/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -309,19 +313,17 @@
   </div>
 </div>
 <script>
-/* If React never loads from the CDN the dc-runtime can't mount and <x-dc> stays hidden -> blank page.
-   Reveal a fallback notice instead. Polls window.React; bails the instant React is present (app will boot). */
+/* Defense-in-depth: React is vendored locally, but if it somehow fails to mount the dc-runtime can't
+   boot and <x-dc> stays hidden -> blank page. Show a notice if nothing mounts. Self-healing: retracts
+   the notice if the app does mount (e.g. a very slow load), so it can never cover a working app. */
 (function () {
   var start = Date.now();
   var iv = setInterval(function () {
-    if (window.React) { clearInterval(iv); return; }
-    if (Date.now() - start > 12000) {
-      clearInterval(iv);
-      if (!window.React && !document.getElementById('dc-root')) {
-        var el = document.getElementById('wc-boot-fallback');
-        if (el) el.style.display = 'flex';
-      }
-    }
+    var el = document.getElementById('wc-boot-fallback');
+    var booted = window.React && document.getElementById('dc-root');
+    if (booted) { if (el) el.style.display = 'none'; clearInterval(iv); return; }
+    if (Date.now() - start > 15000 && el) el.style.display = 'flex';
+    if (Date.now() - start > 60000) clearInterval(iv);
   }, 500);
 })();
 </script>
