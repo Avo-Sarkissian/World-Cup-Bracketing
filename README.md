@@ -14,7 +14,8 @@ standings as real results come in.
 - **The bracket** — Round of 32 → Final, seeded from your group picks using the real FIFA 2026 match
   tree (matches 73–104). The eight best third‑placed teams are ranked across all 12 groups and matched
   to their pre‑assigned slots (a backtracking assignment that respects each slot's allowed groups and
-  never pits a winner against their own group's third). Click a team to send it through.
+  never pits a winner against their own group's third) — and in Predict mode you can **drag that
+  third‑place ranking into any order you like**, with the bracket re‑seeding instantly. Click a team to send it through.
 - **Your picks** — predicted champion, runner‑up, a Golden Boot pick, save to your device, and a
   downloadable share card (PNG).
 - **Compare** — your predicted finishing order vs. the live standings, scored by exact positions,

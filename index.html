@@ -128,18 +128,19 @@
           <div style="font-family:'Anton',sans-serif;font-size:24px;letter-spacing:.01em;">BEST THIRD-PLACED TEAMS</div>
           <div style="font-size:12px;color:#838383;">{{ thirdsNote }}</div>
         </div>
-        <p style="margin:0 0 16px;font-size:13px;color:#767676;max-width:760px;">In the 48-team format the four group runners-up aren't enough — the <b style="color:#9a9a9a;">eight best third-placed teams</b> also reach the Round of 32. They're ranked across all 12 groups by points, then goal difference, and slotted against group winners (never their own).</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;">
+        <p style="margin:0 0 16px;font-size:13px;color:#767676;max-width:760px;">In the 48-team format the four group runners-up aren't enough — the <b style="color:#9a9a9a;">eight best third-placed teams</b> also reach the Round of 32. They're ranked across all 12 groups by points, then goal difference — but in Predict mode you can <b style="color:#9a9a9a;">drag them into any order you like</b>. The top eight advance and are slotted against group winners (never their own); the bracket re-slots instantly.</p>
+        <div data-list style="display:flex;flex-direction:column;gap:6px;">
           <sc-for list="{{ thirdsTable }}" as="t" hint-placeholder-count="12">
-            <div style="display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:8px;background:{{ t.bg }};border:1px solid {{ t.border }};">
-              <span class="num" style="font-family:'Anton',sans-serif;font-size:17px;width:20px;color:{{ t.rankColor }};">{{ t.rank }}</span>
-              <sc-if value="{{ t.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ t.flag }}" alt="" style="width:24px;height:16px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.16);"></sc-if>
-              <sc-if value="{{ t.noFlag }}" hint-placeholder-val="{{ false }}"><span style="width:24px;height:16px;border:1px dashed #3b3b3b;border-radius:2px;"></span></sc-if>
+            <div data-row data-dir="thirds" data-index="{{ t.idx }}" onPointerDown="{{ onGrab }}" class="num" style="position:relative;display:flex;align-items:center;gap:12px;height:46px;padding:0 14px;border-radius:8px;background:{{ t.bg }};border:1px solid {{ t.border }};border-left:3px solid {{ t.barColor }};cursor:{{ t.cursor }};touch-action:none;">
+              <span style="font-family:'Anton',sans-serif;font-size:17px;width:22px;color:{{ t.rankColor }};">{{ t.rank }}</span>
+              <sc-if value="{{ t.hasFlag }}" hint-placeholder-val="{{ true }}"><img loading="lazy" decoding="async" src="{{ t.flag }}" alt="" style="width:26px;height:17px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.16);display:block;"></sc-if>
+              <sc-if value="{{ t.noFlag }}" hint-placeholder-val="{{ false }}"><span style="width:26px;height:17px;border:1px dashed #3b3b3b;border-radius:2px;"></span></sc-if>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:600;color:{{ t.tColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.name }}</div>
+                <div style="font-size:14px;font-weight:600;color:{{ t.tColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ t.name }}</div>
                 <div style="font-size:10.5px;color:#5c5c5c;letter-spacing:.04em;">Group {{ t.group }} · {{ t.oppLabel }}</div>
               </div>
-              <span class="num" style="font-family:'Anton',sans-serif;font-size:18px;color:{{ t.tColor }};">{{ t.pts }}</span>
+              <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:{{ t.barColor }};">{{ t.statusShort }}</span>
+              <span class="num" style="font-family:'Anton',sans-serif;font-size:18px;color:{{ t.tColor }};width:22px;text-align:right;">{{ t.pts }}</span>
             </div>
           </sc-for>
         </div>
@@ -445,15 +446,15 @@ class Component extends DCLogic {
     return o;
   }
   loadInitial() {
-    const def = { view:'groups', mode:'predict', orders:this.defaultOrders(), picks:{}, golden:null, toast:'', updatedAt:Date.now(), feed:'idle' };
+    const def = { view:'groups', mode:'predict', orders:this.defaultOrders(), picks:{}, golden:null, toast:'', updatedAt:Date.now(), feed:'idle', thirdsOrder:null };
     try {
       const raw = localStorage.getItem(this.KEY);
-      if (raw) { const p = JSON.parse(raw); return { ...def, mode:p.mode||'predict', orders:{ ...def.orders, ...(p.orders||{}) }, picks:p.picks||{}, golden:p.golden ?? null }; }
+      if (raw) { const p = JSON.parse(raw); return { ...def, mode:p.mode||'predict', orders:{ ...def.orders, ...(p.orders||{}) }, picks:p.picks||{}, golden:p.golden ?? null, thirdsOrder: Array.isArray(p.thirdsOrder) ? p.thirdsOrder : null }; }
     } catch (e) {}
     return def;
   }
   persist() {
-    try { localStorage.setItem(this.KEY, JSON.stringify({ mode:this.state.mode, orders:this.state.orders, picks:this.state.picks, golden:this.state.golden })); } catch (e) {}
+    try { localStorage.setItem(this.KEY, JSON.stringify({ mode:this.state.mode, orders:this.state.orders, picks:this.state.picks, golden:this.state.golden, thirdsOrder:this.state.thirdsOrder })); } catch (e) {}
   }
   toast(msg) { this.setState({ toast: msg }); clearTimeout(this._toastT); this._toastT = setTimeout(() => this.setState({ toast:'' }), 2200); }
 
@@ -562,6 +563,24 @@ class Component extends DCLogic {
     return [...this.GROUPS[g]].sort((a,b) => T[b].pts-T[a].pts || T[b].gd-T[a].gd || (T[b].gf||0)-(T[a].gf||0) || T[b].rating-T[a].rating);
   }
 
+  // The 12 groups' third-placed teams in seed order. In Predict mode the user can drag them into any
+  // order (state.thirdsOrder, by group letter); otherwise they're ranked by pts -> GD -> GF -> rating.
+  orderedThirds(mode) {
+    const T = this.TEAMS;
+    const base = Object.keys(this.GROUPS).map(g => {
+      const id = mode === 'predict' ? this.state.orders[g][2] : this.actualOrder(g)[2];
+      return { team: T[id], group: g };
+    });
+    const custom = mode === 'predict' && Array.isArray(this.state.thirdsOrder) ? this.state.thirdsOrder : null;
+    if (custom) {
+      const byGroup = {}; base.forEach(o => { byGroup[o.group] = o; });
+      const out = custom.filter(g => byGroup[g]).map(g => byGroup[g]);
+      base.forEach(o => { if (!custom.includes(o.group)) out.push(o); }); // safety: include any groups missing from the saved order
+      return out;
+    }
+    return base.sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || (y.team.gf||0)-(x.team.gf||0) || y.team.rating-x.team.rating);
+  }
+
   // ---------- group drag ----------
   onGrab = (e) => {
     if (this.state.mode !== 'predict') return;
@@ -603,11 +622,19 @@ class Component extends DCLogic {
     d.rows.forEach(r => { r.style.transition=''; r.style.transform=''; r.style.zIndex=''; r.style.boxShadow=''; r.style.cursor=''; });
     this._drag = null;
     if (d.toIndex !== d.fromIndex) {
-      this.setState(s => {
-        const order = [...s.orders[d.dir]];
-        const [m] = order.splice(d.fromIndex, 1); order.splice(d.toIndex, 0, m);
-        return { orders: { ...s.orders, [d.dir]: order } };
-      }, () => this.persist());
+      if (d.dir === 'thirds') {
+        this.setState(() => {
+          const order = this.orderedThirds('predict').map(o => o.group);
+          const [m] = order.splice(d.fromIndex, 1); order.splice(d.toIndex, 0, m);
+          return { thirdsOrder: order };
+        }, () => this.persist());
+      } else {
+        this.setState(s => {
+          const order = [...s.orders[d.dir]];
+          const [m] = order.splice(d.fromIndex, 1); order.splice(d.toIndex, 0, m);
+          return { orders: { ...s.orders, [d.dir]: order } };
+        }, () => this.persist());
+      }
     }
   };
 
@@ -646,10 +673,7 @@ class Component extends DCLogic {
     const allThirdsKnown = mode === 'predict' || Object.keys(this.GROUPS).every(g => this.LOCKED[g] >= 3);
     let assignMap = {}, teamToSlot = {}, rankedThirds = [];
     if (allThirdsKnown) {
-      rankedThirds = Object.keys(this.GROUPS).map(g => {
-        const id = mode === 'predict' ? this.state.orders[g][2] : this.actualOrder(g)[2];
-        return { team: T[id], group: g };
-      }).sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || (y.team.gf||0)-(x.team.gf||0) || y.team.rating-x.team.rating);
+      rankedThirds = this.orderedThirds(mode);
       assignMap = this.assignThirds(rankedThirds.slice(0, 8));
       Object.keys(assignMap).forEach(mid => { teamToSlot[assignMap[mid].team.id] = this.THIRD_SLOT_WG[mid]; });
     }
@@ -716,7 +740,7 @@ class Component extends DCLogic {
 
   onPickGolden = (e) => { const id = e.currentTarget.dataset.player; this.setState(s => ({ golden: s.golden === id ? null : id }), () => this.persist()); };
   onSave = () => { this.persist(); this.toast('Predictions saved'); };
-  onReset = () => { this.setState({ orders:this.defaultOrders(), picks:{}, golden:null }, () => { this.persist(); this.toast('Reset to seeding'); }); };
+  onReset = () => { this.setState({ orders:this.defaultOrders(), picks:{}, golden:null, thirdsOrder:null }, () => { this.persist(); this.toast('Reset to seeding'); }); };
   onShare = () => {
     const { champion } = this.computeBracket('predict');
     const g = this.state.golden ? (this.PLAYERS.find(p => p.id === this.state.golden) || {}).name : '—';
@@ -730,8 +754,7 @@ class Component extends DCLogic {
   // ---------- quick-fill ----------
   predictR32Sides() {
     const T = this.TEAMS;
-    const ranked = Object.keys(this.GROUPS).map(g => ({ team:T[this.state.orders[g][2]], group:g }))
-      .sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || (y.team.gf||0)-(x.team.gf||0) || y.team.rating-x.team.rating);
+    const ranked = this.orderedThirds('predict');
     const assignMap = this.assignThirds(ranked.slice(0, 8));
     const getPos = (g, pos) => T[this.state.orders[g][pos]];
     const side = (s, mid) => s.t === 'W' ? getPos(s.g,0) : s.t === 'R' ? getPos(s.g,1) : (assignMap[mid] ? assignMap[mid].team : null);
@@ -805,21 +828,24 @@ class Component extends DCLogic {
   buildThirdsTable(mode, info) {
     const T = this.TEAMS;
     if (info.allThirdsKnown) {
+      const drag = mode === 'predict';
       return info.rankedThirds.map((o, i) => {
         const t = o.team, q = i < 8, wg = info.teamToSlot[t.id];
         return {
-          rank:String(i+1), name:t.name, flag:t.flag, hasFlag:true, noFlag:false, group:o.group, pts:t.pts, qualifies:q,
-          oppLabel: (q && wg) ? ('plays 1' + wg) : 'eliminated',
+          idx:i, rank:String(i+1), name:t.name, flag:t.flag, hasFlag:true, noFlag:false, group:o.group, pts:t.pts, qualifies:q,
+          oppLabel: (q && wg) ? ('plays 1' + wg) : 'eliminated', statusShort: q ? 'IN' : 'OUT',
+          barColor: q ? '#57c98a' : '#3b3b3b',
           bg: q ? 'rgba(87,201,138,.10)' : '#1c1c1c', border: q ? 'rgba(87,201,138,.4)' : '#272727',
           tColor: q ? '#eafef0' : '#6e6e6e', rankColor: q ? '#57c98a' : '#5c5c5c',
+          cursor: drag ? 'grab' : 'default',
         };
       });
     }
     const rows = [], known = [];
     Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] >= 3) known.push({ team:T[this.actualOrder(g)[2]], group:g }); });
     known.sort((a,b) => b.team.pts-a.team.pts || b.team.gd-a.team.gd || (b.team.gf||0)-(a.team.gf||0));
-    known.forEach((o, i) => rows.push({ rank:String(i+1), name:o.team.name, flag:o.team.flag, hasFlag:true, noFlag:false, group:o.group, pts:o.team.pts, oppLabel:'provisional', bg:'#1c1c1c', border:'#272727', tColor:'#d2d2d2', rankColor:'#5c5c5c' }));
-    Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] < 3) rows.push({ rank:'–', name:'Group ' + g + ' third', flag:'', hasFlag:false, noFlag:true, group:g, pts:'–', oppLabel:'not yet decided', bg:'#151515', border:'#242424', tColor:'#5c5c5c', rankColor:'#3b3b3b' }); });
+    known.forEach((o) => rows.push({ idx:rows.length, rank:String(rows.length+1), name:o.team.name, flag:o.team.flag, hasFlag:true, noFlag:false, group:o.group, pts:o.team.pts, oppLabel:'provisional', statusShort:'', barColor:'#3b3b3b', bg:'#1c1c1c', border:'#272727', tColor:'#d2d2d2', rankColor:'#5c5c5c', cursor:'default' }));
+    Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] < 3) rows.push({ idx:rows.length, rank:'–', name:'Group ' + g + ' third', flag:'', hasFlag:false, noFlag:true, group:g, pts:'–', oppLabel:'not yet decided', statusShort:'', barColor:'#3b3b3b', bg:'#151515', border:'#242424', tColor:'#5c5c5c', rankColor:'#3b3b3b', cursor:'default' }); });
     return rows;
   }
 
@@ -902,7 +928,7 @@ class Component extends DCLogic {
       groupSub: isLive ? 'Live standings from the feed. Drag is locked — positions confirm (Q / OUT) as matches finish; the rest stay TBD.' : 'Drag teams to set your predicted finishing order. The bracket re-slots instantly — including who each best-third faces. Points shown are live.',
       bracketSub: isLive ? 'The real fixture tree. Confirmed group positions are placed; everything still undecided — and every best-third slot — shows TBD until results land.' : 'Seeded from your group picks using the official slotting (winners, runners-up, and eight best thirds). Click a team to send them through; your pick advances up the bracket.',
       groupViews,
-      thirdsTable, thirdsNote: info.allThirdsKnown ? 'Top 8 advance · ranked by points, then GD' : 'Provisional — locks once every group is complete',
+      thirdsTable, thirdsNote: mode === 'predict' ? 'Drag to set your order · top 8 advance' : info.allThirdsKnown ? 'Top 8 advance · ranked by points, then GD' : 'Provisional — locks once every group is complete',
       rounds, champion,
       predChampion, predRunnerUp, players,
       compareRows, score:{ exact, quals, winners }, pickStats,
