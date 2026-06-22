@@ -52,15 +52,15 @@ Minimal, surgical path: keep `support.js` as a static asset, edit only the logic
   Replace the hardcoded "Matchday 2" label with a derived feed label; surface an "offline → demo data" state.
 
 ### 4. Deployment: GitHub Pages (static, free, matches the repo)
-Pure static site (`index.html` + `support.js` + `screens/`). A GitHub Actions workflow deploys `main` to
-Pages. `.nojekyll` so dotfiles/underscores serve correctly. No secrets required.
+Pure static site (`index.html` + `support.js` + `screens/`). GitHub Pages serves it directly from `main`
+(root) — no build step or workflow needed. `.nojekyll` so dotfiles/underscores serve correctly. No secrets required.
 
 ## Success conditions (verifiable)
 1. App loads at the Pages URL and renders all four views (Groups / Bracket / Your Picks / Compare).
 2. On load it fetches openfootball and group standings reflect real results (verified: Group A etc. match the live feed).
 3. With the network blocked, the app still renders fully from the embedded snapshot (no crash).
 4. Drag-to-reorder, click-to-advance, golden boot, save, reset, surprise-me, share, download-card all work.
-5. Repo is pushed to `Avo-Sarkissian/World-Cup-Bracketing` with a README and the Pages workflow.
+5. Repo is pushed to `Avo-Sarkissian/World-Cup-Bracketing` with a README and GitHub Pages enabled (main/root).
 
 ## Out of scope (v1)
 - In-play minute-by-minute scores (needs a keyed real-time API + proxy).

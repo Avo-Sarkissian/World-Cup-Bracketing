@@ -296,6 +296,35 @@
 
 </div>
 </x-dc>
+
+<!-- Boot fallback: the dc-runtime hides <x-dc> until React (loaded from a CDN by support.js) mounts the app.
+     If that CDN is blocked or fails, show a signal instead of a silently blank page. -->
+<noscript><div style="font-family:system-ui,sans-serif;color:#f3f3f3;background:#0a0a0a;padding:28px;text-align:center;">WC26 Predictor needs JavaScript enabled to run.</div></noscript>
+<div id="wc-boot-fallback" style="display:none;position:fixed;inset:0;z-index:9999;background:#0a0a0a;color:#f3f3f3;font-family:system-ui,-apple-system,sans-serif;align-items:center;justify-content:center;text-align:center;padding:24px;">
+  <div style="max-width:420px;">
+    <div style="font-size:40px;margin-bottom:10px;">🏆</div>
+    <div style="font-weight:700;font-size:18px;margin-bottom:8px;">Couldn't load the app</div>
+    <div style="color:#9a9a9a;font-size:14px;line-height:1.5;margin-bottom:18px;">A required library failed to load from its CDN — usually a network drop, an ad/content blocker, or a region/proxy block. Check your connection and retry.</div>
+    <button onclick="location.reload()" style="background:#f5b13d;border:none;color:#1a1505;font-weight:700;font-size:14px;padding:10px 20px;border-radius:7px;cursor:pointer;">Retry</button>
+  </div>
+</div>
+<script>
+/* If React never loads from the CDN the dc-runtime can't mount and <x-dc> stays hidden -> blank page.
+   Reveal a fallback notice instead. Polls window.React; bails the instant React is present (app will boot). */
+(function () {
+  var start = Date.now();
+  var iv = setInterval(function () {
+    if (window.React) { clearInterval(iv); return; }
+    if (Date.now() - start > 12000) {
+      clearInterval(iv);
+      if (!window.React && !document.getElementById('dc-root')) {
+        var el = document.getElementById('wc-boot-fallback');
+        if (el) el.style.display = 'flex';
+      }
+    }
+  }, 500);
+})();
+</script>
 <script type="text/x-dc" data-dc-script data-props="{
   &quot;accentColor&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#f5b13d&quot;, &quot;tsType&quot;: &quot;string&quot; },
   &quot;showPoints&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
@@ -326,7 +355,7 @@ class Component extends DCLogic {
       ['eng','England','gb-eng',88,4,2],   ['cro','Croatia','hr',82,4,1],        ['gha','Ghana','gh',76,3,0],         ['pan','Panama','pa',67,0,-3],
     ];
     this.TEAMS = {};
-    RAW.forEach(([id,name,code,r,pts,gd]) => { this.TEAMS[id] = { id, name, code, rating:r, pts, gd, flag:'https://flagcdn.com/w80/'+code+'.png' }; });
+    RAW.forEach(([id,name,code,r,pts,gd]) => { this.TEAMS[id] = { id, name, code, rating:r, pts, gd, gf:0, flag:'https://flagcdn.com/w80/'+code+'.png' }; });
     this.GROUPS = {
       A:['mex','rsa','kor','cze'], B:['can','bih','qat','sui'], C:['bra','mar','hai','sco'],
       D:['usa','par','aus','tur'], E:['ger','civ','ecu','cuw'], F:['ned','swe','tun','jpn'],
@@ -465,7 +494,7 @@ class Component extends DCLogic {
     });
     Object.values(this.TEAMS).forEach(t => { if (!nameToId[t.name]) nameToId[t.name] = t.id; });
 
-    const stat = {}; Object.keys(this.TEAMS).forEach(id => stat[id] = { pts: 0, gd: 0 });
+    const stat = {}; Object.keys(this.TEAMS).forEach(id => stat[id] = { pts: 0, gd: 0, gf: 0 });
     const groupPlayed = {}; Object.keys(this.GROUPS).forEach(g => groupPlayed[g] = 0);
     const groupMatches = [];
     (data.matches || []).forEach(m => {
@@ -477,7 +506,7 @@ class Component extends DCLogic {
       const played = Array.isArray(ft) && ft.length === 2;
       if (played) {
         const sa = ft[0], sb = ft[1];
-        stat[a].gd += sa - sb; stat[b].gd += sb - sa;
+        stat[a].gd += sa - sb; stat[b].gd += sb - sa; stat[a].gf += sa; stat[b].gf += sb;
         stat[a].pts += sa > sb ? 3 : sa === sb ? 1 : 0;
         stat[b].pts += sb > sa ? 3 : sa === sb ? 1 : 0;
         groupPlayed[g]++;
@@ -485,7 +514,7 @@ class Component extends DCLogic {
       groupMatches.push({ g, a, b, sa: played ? ft[0] : null, sb: played ? ft[1] : null, played, date: m.date || '', time: m.time || '' });
     });
 
-    const teams = {}; Object.keys(stat).forEach(id => teams[id] = { pts: stat[id].pts, gd: stat[id].gd });
+    const teams = {}; Object.keys(stat).forEach(id => teams[id] = { pts: stat[id].pts, gd: stat[id].gd, gf: stat[id].gf });
     const locked = {}; Object.keys(this.GROUPS).forEach(g => locked[g] = groupPlayed[g] >= 6 ? 4 : 0);
     const fixtures = this.buildLiveFixtures(groupMatches);
     return { teams, fixtures, locked, updatedAt: Date.now() };
@@ -505,7 +534,7 @@ class Component extends DCLogic {
   applyLive(data) {
     if (!data) return;
     if (data.teams) Object.keys(data.teams).forEach(id => {
-      if (this.TEAMS[id]) { this.TEAMS[id].pts = data.teams[id].pts; this.TEAMS[id].gd = data.teams[id].gd; }
+      if (this.TEAMS[id]) { this.TEAMS[id].pts = data.teams[id].pts; this.TEAMS[id].gd = data.teams[id].gd; this.TEAMS[id].gf = data.teams[id].gf || 0; }
     });
     if (Array.isArray(data.fixtures) && data.fixtures.length) this.FIXTURES = data.fixtures;
     if (data.locked) this.LOCKED = data.locked;
@@ -528,7 +557,7 @@ class Component extends DCLogic {
 
   actualOrder(g) {
     const T = this.TEAMS;
-    return [...this.GROUPS[g]].sort((a,b) => T[b].pts-T[a].pts || T[b].gd-T[a].gd || T[b].rating-T[a].rating);
+    return [...this.GROUPS[g]].sort((a,b) => T[b].pts-T[a].pts || T[b].gd-T[a].gd || (T[b].gf||0)-(T[a].gf||0) || T[b].rating-T[a].rating);
   }
 
   // ---------- group drag ----------
@@ -618,7 +647,7 @@ class Component extends DCLogic {
       rankedThirds = Object.keys(this.GROUPS).map(g => {
         const id = mode === 'predict' ? this.state.orders[g][2] : this.actualOrder(g)[2];
         return { team: T[id], group: g };
-      }).sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || y.team.rating-x.team.rating);
+      }).sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || (y.team.gf||0)-(x.team.gf||0) || y.team.rating-x.team.rating);
       assignMap = this.assignThirds(rankedThirds.slice(0, 8));
       Object.keys(assignMap).forEach(mid => { teamToSlot[assignMap[mid].team.id] = this.THIRD_SLOT_WG[mid]; });
     }
@@ -700,7 +729,7 @@ class Component extends DCLogic {
   predictR32Sides() {
     const T = this.TEAMS;
     const ranked = Object.keys(this.GROUPS).map(g => ({ team:T[this.state.orders[g][2]], group:g }))
-      .sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || y.team.rating-x.team.rating);
+      .sort((x,y) => y.team.pts-x.team.pts || y.team.gd-x.team.gd || (y.team.gf||0)-(x.team.gf||0) || y.team.rating-x.team.rating);
     const assignMap = this.assignThirds(ranked.slice(0, 8));
     const getPos = (g, pos) => T[this.state.orders[g][pos]];
     const side = (s, mid) => s.t === 'W' ? getPos(s.g,0) : s.t === 'R' ? getPos(s.g,1) : (assignMap[mid] ? assignMap[mid].team : null);
@@ -786,7 +815,7 @@ class Component extends DCLogic {
     }
     const rows = [], known = [];
     Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] >= 3) known.push({ team:T[this.actualOrder(g)[2]], group:g }); });
-    known.sort((a,b) => b.team.pts-a.team.pts || b.team.gd-a.team.gd);
+    known.sort((a,b) => b.team.pts-a.team.pts || b.team.gd-a.team.gd || (b.team.gf||0)-(a.team.gf||0));
     known.forEach((o, i) => rows.push({ rank:String(i+1), name:o.team.name, flag:o.team.flag, hasFlag:true, noFlag:false, group:o.group, pts:o.team.pts, oppLabel:'provisional', bg:'#1c1c1c', border:'#272727', tColor:'#d2d2d2', rankColor:'#5c5c5c' }));
     Object.keys(this.GROUPS).forEach(g => { if (this.LOCKED[g] < 3) rows.push({ rank:'–', name:'Group ' + g + ' third', flag:'', hasFlag:false, noFlag:true, group:g, pts:'–', oppLabel:'not yet decided', bg:'#151515', border:'#242424', tColor:'#5c5c5c', rankColor:'#3b3b3b' }); });
     return rows;
