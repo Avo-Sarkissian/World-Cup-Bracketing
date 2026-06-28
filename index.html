@@ -42,6 +42,7 @@
     .wc-toggle button{padding:5px 10px !important;}
     .wc-save{margin-left:auto !important;}
     .wc-save,.wc-share{padding:7px 11px !important;}
+    .wc-toggle{order:1;flex-basis:100%;justify-content:center;}
     .wc-nav{order:2;flex-basis:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
     .wc-nav button{white-space:nowrap;}
     .wc-picks-top{grid-template-columns:1fr !important;}
@@ -65,6 +66,7 @@
     <div class="wc-toggle" style="display:flex;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:9px;padding:3px;gap:3px;">
       <button data-mode="live" onClick="{{ onMode }}" style="display:flex;align-items:center;gap:6px;background:{{ liveBg }};border:none;color:{{ liveColor }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .2s;"><span style="width:6px;height:6px;border-radius:50%;background:{{ liveDot }};"></span>Live</button>
       <button data-mode="predict" onClick="{{ onMode }}" style="background:{{ predBg }};border:none;color:{{ predColor }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .2s;">Predict</button>
+      <button data-mode="knockout" onClick="{{ onMode }}" style="background:{{ koBg }};border:none;color:{{ koColor }};font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .2s;">Knockout</button>
     </div>
 
     <nav class="wc-nav" style="display:flex;gap:2px;">
@@ -737,7 +739,7 @@ class Component extends DCLogic {
     const fm = raw[raw.length - 1].matches[0];
     const champion = resultById[fm.id] || { tbd:true, label:'TBD' };
     let runnerUp = { tbd:true, label:'TBD' };
-    if (mode === 'predict' && !fm.a.tbd && !fm.b.tbd && champion.team) runnerUp = champion.team.id === fm.a.team.id ? { team:fm.b.team } : { team:fm.a.team };
+    if (mode !== 'live' && !fm.a.tbd && !fm.b.tbd && champion.team) runnerUp = champion.team.id === fm.a.team.id ? { team:fm.b.team } : { team:fm.a.team };
     return { raw, champion, runnerUp, rankedThirds, teamToSlot, allThirdsKnown };
   }
 
@@ -749,12 +751,12 @@ class Component extends DCLogic {
       rowBg: isWin ? 'rgba(87,201,138,.14)' : 'transparent',
       tColor: isWin ? '#eafef0' : '#838383',
       weight: isWin ? '700' : '500', flagOp: isWin ? '1' : '.5',
-      mark: isWin ? '✓' : '', cursor: mode === 'predict' ? 'pointer' : 'default',
+      mark: isWin ? '✓' : '', cursor: mode !== 'live' ? 'pointer' : 'default',
     };
   }
   matchView(m, mode) {
     let aWin = false, bWin = false;
-    if (mode === 'predict' && !m.a.tbd && !m.b.tbd) {
+    if (mode !== 'live' && !m.a.tbd && !m.b.tbd) {
       const w = this.resolveWinner(m.a.team, m.b.team, m.id);
       aWin = w.id === m.a.team.id; bWin = !aWin;
     }
@@ -762,7 +764,7 @@ class Component extends DCLogic {
   }
 
   onPick = (e) => {
-    if (this.state.mode !== 'predict') return;
+    if (this.state.mode === 'live') return;
     const row = e.currentTarget, mid = row.dataset.matchId, tid = row.dataset.teamId;
     if (!tid) return;
     this.setState(s => ({ picks: { ...s.picks, [mid]: tid } }), () => { this.persist(); this.animateAdvance(mid, tid); });
@@ -782,7 +784,7 @@ class Component extends DCLogic {
   onSave = () => { this.persist(); this.toast('Predictions saved'); };
   onReset = () => { this.setState({ orders:this.defaultOrders(), picks:{}, golden:null, thirdsOrder:null }, () => { this.persist(); this.toast('Reset to seeding'); }); };
   onShare = () => {
-    const { champion } = this.computeBracket('predict');
+    const { champion } = this.computeBracket(this.state.mode === 'live' ? 'predict' : this.state.mode);
     const g = this.state.golden ? (this.PLAYERS.find(p => p.id === this.state.golden) || {}).name : '—';
     const text = ['My World Cup 2026 prediction', 'Champion: ' + (champion.team ? champion.team.name : '—'), 'Golden Boot: ' + g].join('\n');
     try {
@@ -792,29 +794,29 @@ class Component extends DCLogic {
   };
 
   // ---------- quick-fill ----------
-  predictR32Sides() {
+  predictR32Sides(mode) {
     const T = this.TEAMS;
-    const ranked = this.orderedThirds('predict');
+    const ranked = this.orderedThirds(mode);
     const assignMap = this.assignThirds(ranked.slice(0, 8));
-    const getPos = (g, pos) => T[this.state.orders[g][pos]];
+    const getPos = (g, pos) => mode === 'predict' ? T[this.state.orders[g][pos]] : (pos < this.LOCKED[g] ? T[this.actualOrder(g)[pos]] : null);
     const side = (s, mid) => s.t === 'W' ? getPos(s.g,0) : s.t === 'R' ? getPos(s.g,1) : (assignMap[mid] ? assignMap[mid].team : null);
     return this.R32_DEF.map(d => ({ id:d.id, a:side(d.a, d.id), b:side(d.b, d.id) }));
   }
-  simulate(chooser) {
+  simulate(chooser, mode) {
     const picks = {}, resultById = {};
-    const winner = (m) => { const w = chooser(m.a, m.b); picks[m.id] = w.id; return w; };
-    this.predictR32Sides().forEach(m => { resultById[m.id] = winner(m); });
+    const winner = (m) => { if (!m.a || !m.b) return m.a || m.b; const w = chooser(m.a, m.b); picks[m.id] = w.id; return w; };
+    this.predictR32Sides(mode).forEach(m => { resultById[m.id] = winner(m); });
     this.KO_DEF.forEach(rd => rd.matches.forEach(md => {
       resultById[md.id] = winner({ id:md.id, a:resultById[md.a], b:resultById[md.b] });
     }));
     return picks;
   }
   onChalk = () => { this.setState({ picks:{} }, () => { this.persist(); this.toast('Reset to favorites'); }); };
-  onSurprise = () => { const picks = this.simulate((a,b) => Math.random() < 0.5 ? a : b); this.setState({ picks }, () => { this.persist(); this.toast('Bracket randomised'); }); };
+  onSurprise = () => { const picks = this.simulate((a,b) => Math.random() < 0.5 ? a : b, this.state.mode); this.setState({ picks }, () => { this.persist(); this.toast('Bracket randomised'); }); };
 
   // ---------- share card ----------
   onDownloadCard = () => {
-    const { champion, runnerUp } = this.computeBracket('predict');
+    const { champion, runnerUp } = this.computeBracket(this.state.mode === 'live' ? 'predict' : this.state.mode);
     const cName = champion.team ? champion.team.name : '—';
     const rName = runnerUp.team ? runnerUp.team.name : '—';
     const gp = this.state.golden ? (this.PLAYERS.find(p => p.id === this.state.golden) || {}) : null;
@@ -909,12 +911,12 @@ class Component extends DCLogic {
     const isLive = mode === 'live';
 
     const info = this.computeBracket(mode);
-    const predInfo = this.computeBracket('predict');
+    const predInfo = this.computeBracket(mode === 'live' ? 'predict' : mode);
 
     const statusMap = { A:'', B:'', C:'', D:'', E:'', F:'', G:'', H:'', I:'', J:'', K:'', L:'' };
     const groupViews = Object.keys(this.GROUPS).map(g => {
       const lk = this.LOCKED[g];
-      const status = isLive ? (lk >= 4 ? 'Final standings' : lk >= 1 ? 'In progress · '+lk+' confirmed' : 'Kicking off · open') : 'Drag to predict';
+      const status = mode !== 'predict' ? (lk >= 4 ? 'Final standings' : lk >= 1 ? 'In progress · '+lk+' confirmed' : 'Kicking off · open') : 'Drag to predict';
       return { letter:g, status, rows:this.buildGroup(mode, g) };
     });
 
@@ -965,10 +967,11 @@ class Component extends DCLogic {
     return {
       accent, showPoints, showLabels, tabs,
       liveBg: isLive ? '#353535' : 'transparent', liveColor: isLive ? '#f3f3f3' : '#767676', liveDot: isLive ? '#ff5a4d' : '#5c5c5c',
-      predBg: !isLive ? accent : 'transparent', predColor: !isLive ? '#1a1505' : '#767676',
+      predBg: mode === 'predict' ? accent : 'transparent', predColor: mode === 'predict' ? '#1a1505' : '#767676',
+      koBg: mode === 'knockout' ? accent : 'transparent', koColor: mode === 'knockout' ? '#1a1505' : '#767676',
       isGroups:v==='groups', isBracket:v==='bracket', isPicks:v==='picks', isCompare:v==='compare',
-      groupSub: isLive ? 'Live standings from the feed. Drag is locked — positions confirm (Q / OUT) as matches finish; the rest stay TBD.' : 'Drag teams to set your predicted finishing order. The bracket re-slots instantly — including who each best-third faces. Points shown are live.',
-      bracketSub: isLive ? 'The real fixture tree. Confirmed group positions are placed; everything still undecided — and every best-third slot — shows TBD until results land.' : 'Seeded from your group picks using the official slotting (winners, runners-up, and eight best thirds). Click a team to send them through; your pick advances up the bracket.',
+      groupSub: mode === 'knockout' ? 'Group stage is final — locked to the actual results. Predict the knockouts over on the Bracket tab.' : isLive ? 'Live standings from the feed. Drag is locked — positions confirm (Q / OUT) as matches finish; the rest stay TBD.' : 'Drag teams to set your predicted finishing order. The bracket re-slots instantly — including who each best-third faces. Points shown are live.',
+      bracketSub: mode === 'knockout' ? 'Seeded from the real final group results — winners, runners-up and the eight best thirds. Click a team to send them through; your pick advances up the bracket.' : isLive ? 'The real fixture tree. Confirmed group positions are placed; everything still undecided — and every best-third slot — shows TBD until results land.' : 'Seeded from your group picks using the official slotting (winners, runners-up, and eight best thirds). Click a team to send them through; your pick advances up the bracket.',
       groupViews,
       thirdsTable, thirdsNote: mode === 'predict' ? 'Drag to set your order · top 8 advance' : info.allThirdsKnown ? 'Top 8 advance · ranked by points, then GD' : 'Provisional — locks once every group is complete',
       rounds, champion,
